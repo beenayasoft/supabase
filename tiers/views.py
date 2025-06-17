@@ -11,7 +11,7 @@ from .serializers import (
     TiersListSerializer, TiersDetailSerializer, TiersCreateUpdateSerializer,
     AdresseSerializer, ContactSerializer, ActiviteTiersSerializer, ActiviteTiersCreateSerializer
 )
-
+from .filters import TiersFilter
 
 class TiersViewSet(viewsets.ModelViewSet):
     """
@@ -19,7 +19,7 @@ class TiersViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['type', 'flags', 'assigned_user', 'is_deleted']
+    filterset_class = TiersFilter
     search_fields = ['nom', 'siret', 'tva']
     ordering_fields = ['nom', 'date_creation', 'date_modification']
     ordering = ['-date_creation']
@@ -34,9 +34,12 @@ class TiersViewSet(viewsets.ModelViewSet):
             queryset = Tiers.objects.all()
         
         # Filtre par utilisateur assigné (sauf pour les superusers)
-        if not self.request.user.is_superuser:
-            queryset = queryset.filter(assigned_user=self.request.user)
-        
+        #if not self.request.user.is_superuser:
+         #   queryset = queryset.filter(assigned_user=self.request.user)
+
+         #une solution plus flexible en attendant de tout developper/ à supprimer si possible
+          # Voir les tiers assignés à l'utilisateur OU sans assignation
+        Q(assigned_user=self.request.user) | Q(assigned_user__isnull=True)
         return queryset
     
     def get_serializer_class(self):
