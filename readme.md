@@ -2,16 +2,13 @@
 - **Place-toi dans le dossier `supabase` avant d'exécuter une commande concernant le backend Django.**  
 - **Vérifie que tu es bien dans le dossier `beena` avant de lancer toute commande liée au frontend (React + Tailwind).**  
 - **Suis strictement les directives sans ajouter de fonctionnalités supplémentaires.** Tu peux cependant proposer des suggestions à l’utilisateur et attendre son approbation avant d’implémenter quoi que ce soit.  
-- **Facilite la connexion entre le frontend et le backend via les API exposées par les modules concernés.**  
+- **Facilite la connexion entre le frontend et le backend via les API exposées par les modules concernés.**              
 
-Utilise tous tes outils disponibles en mode chat et veille à exécuter chaque étape avec rigueur et méthode. 🚀
-.......................................................................................................................
-Prompt 
-imagine une user story qui utilise l'endpoint crée, pour que je puisse voir a chaque moment et visualiser un cas reel d'utilisation selon
-le template suivante :
-.........................................................................................................................................
-Template
-..........................................................................................................................
+Utilise tous tes outils disponibles en mode chat et veille à exécuter chaque étape avec rigueur et méthode. 🚀     
+
+Prompt  : imagine une user story qui utilise l'endpoint crée, pour que je puisse voir a chaque moment et visualiser un cas reel d'utilisation selon
+le template suivante :     
+.............................................................................................................        
 ### User Story illustrant les endpoints d'authentification
 #### 1. Inscription d’un nouvel utilisateur  
 **Endpoint:** `POST /api/auth/register/`  
