@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
     "authentification",
+    "bibliotheque",  # Ajout de l'application bibliotheque
 ]
 
 # Configuration REST Framework
