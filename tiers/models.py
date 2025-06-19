@@ -12,10 +12,10 @@ class Tiers(models.Model):
     
     # Types de tiers
     TYPE_ENTREPRISE = 'entreprise'
-    TYPE_INDIVIDU = 'individu'
+    TYPE_PARTICULIER = 'particulier'
     TYPE_CHOICES = [
         (TYPE_ENTREPRISE, _('Entreprise')),
-        (TYPE_INDIVIDU, _('Individu')),
+        (TYPE_PARTICULIER, _('Particulier')),
     ]
     
     # Flags pour catégoriser les tiers
@@ -95,10 +95,10 @@ class Adresse(models.Model):
         related_name='adresses',
         verbose_name=_('Tier')
     )
-    libelle = models.CharField(max_length=100, verbose_name=_('Libellé'))
-    rue = models.CharField(max_length=255, verbose_name=_('Rue'))
-    ville = models.CharField(max_length=100, verbose_name=_('Ville'))
-    code_postal = models.CharField(max_length=10, verbose_name=_('Code postal'))
+    libelle = models.CharField(max_length=100, blank=True, verbose_name=_('Libellé'))
+    rue = models.CharField(max_length=255, blank=True, verbose_name=_('Rue'))
+    ville = models.CharField(max_length=100, blank=True, verbose_name=_('Ville'))
+    code_postal = models.CharField(max_length=10, blank=True, verbose_name=_('Code postal'))
     pays = models.CharField(max_length=100, default='France', verbose_name=_('Pays'))
     facturation = models.BooleanField(default=False, verbose_name=_('Adresse de facturation'))
     
@@ -130,8 +130,8 @@ class Contact(models.Model):
         related_name='contacts',
         verbose_name=_('Tier')
     )
-    nom = models.CharField(max_length=100, verbose_name=_('Nom'))
-    prenom = models.CharField(max_length=100, verbose_name=_('Prénom'))
+    nom = models.CharField(max_length=100, blank=True, verbose_name=_('Nom'))
+    prenom = models.CharField(max_length=100, blank=True, verbose_name=_('Prénom'))
     fonction = models.CharField(max_length=100, blank=True, verbose_name=_('Fonction'))
     email = models.EmailField(blank=True, verbose_name=_('Email'))
     telephone = models.CharField(max_length=20, blank=True, verbose_name=_('Téléphone'))

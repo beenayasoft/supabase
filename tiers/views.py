@@ -9,7 +9,8 @@ from django.utils import timezone
 from .models import Tiers, Adresse, Contact, ActiviteTiers
 from .serializers import (
     TiersListSerializer, TiersDetailSerializer, TiersCreateUpdateSerializer,
-    AdresseSerializer, ContactSerializer, ActiviteTiersSerializer, ActiviteTiersCreateSerializer
+    AdresseSerializer, ContactSerializer, ActiviteTiersSerializer, ActiviteTiersCreateSerializer,
+    TiersFrontendSerializer
 )
 from .filters import TiersFilter
 
@@ -152,6 +153,37 @@ class TiersViewSet(viewsets.ModelViewSet):
         )
         
         return Response({"message": "Tier restauré avec succès"})
+
+    @action(detail=False, methods=['get'])
+    def frontend_format(self, request):
+        """Vue spécialisée pour le frontend"""
+        queryset = self.get_queryset()
+        # Appliquer les filtres
+        if 'type' in request.query_params:
+            type_filter = request.query_params.get('type')
+            if type_filter and type_filter != 'tous':
+                queryset = queryset.filter(flags__contains=[type_filter.rstrip('s')])
+        
+        # Appliquer la recherche
+        search = request.query_params.get('search', '')
+        if search:
+            queryset = queryset.filter(
+                Q(nom__icontains=search) |
+                Q(contacts__email__icontains=search) |
+                Q(contacts__telephone__icontains=search) |
+                Q(contacts__nom__icontains=search) |
+                Q(contacts__prenom__icontains=search) |
+                Q(siret__icontains=search)
+            ).distinct()
+        
+        # Pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = TiersFrontendSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = TiersFrontendSerializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class AdresseViewSet(viewsets.ModelViewSet):

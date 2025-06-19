@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Tiers, Adresse, Contact, ActiviteTiers
+from django import forms
 
 
 class AdresseInline(admin.TabularInline):
@@ -22,6 +23,27 @@ class ActiviteTiersInline(admin.TabularInline):
     can_delete = False
 
 
+class TiersAdminForm(forms.ModelForm):
+    FLAG_CHOICES = Tiers.FLAG_CHOICES
+
+    flags = forms.MultipleChoiceField(
+        choices=FLAG_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Catégories (flags)"
+    )
+
+    class Meta:
+        model = Tiers
+        fields = '__all__'
+
+    def clean_flags(self):
+        # S'assurer que seules les valeurs autorisées sont enregistrées
+        flags = self.cleaned_data['flags']
+        allowed = [choice[0] for choice in self.FLAG_CHOICES]
+        return [flag for flag in flags if flag in allowed]
+
+
 @admin.register(Tiers)
 class TiersAdmin(admin.ModelAdmin):
     list_display = ['nom', 'type', 'get_flags_display', 'assigned_user', 'date_creation', 'is_deleted']
@@ -29,6 +51,7 @@ class TiersAdmin(admin.ModelAdmin):
     search_fields = ['nom', 'siret', 'tva']
     readonly_fields = ['id', 'date_creation', 'date_modification', 'date_archivage']
     inlines = [AdresseInline, ContactInline, ActiviteTiersInline]
+    form = TiersAdminForm
     
     fieldsets = (
         ('Informations générales', {

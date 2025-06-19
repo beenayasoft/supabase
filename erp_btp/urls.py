@@ -26,7 +26,7 @@ urlpatterns = [
     path("api/auth/", include("authentification.urls")),
     
     # API Tiers endpoints
-    path("api/", include("tiers.urls")),
+    path("api/tiers/", include("tiers.urls")),
     
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

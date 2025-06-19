@@ -168,3 +168,55 @@ class ActiviteTiersCreateSerializer(serializers.ModelSerializer):
         validated_data['utilisateur'] = self.context['request'].user
         validated_data['tier'] = self.context['tier']
         return super().create(validated_data)
+
+
+class TiersFrontendSerializer(serializers.ModelSerializer):
+    """Serializer adapté pour le frontend React"""
+    id = serializers.CharField(read_only=True)
+    name = serializers.CharField(source='nom')
+    type = serializers.SerializerMethodField()
+    contact = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
+    siret = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Tiers
+        fields = [
+            'id', 'name', 'type', 'contact', 'email', 'phone', 
+            'address', 'siret', 'status'
+        ]
+    
+    def get_type(self, obj):
+        """Renvoie les flags comme type"""
+        return obj.flags if obj.flags else []
+    
+    def get_contact(self, obj):
+        """Récupère le nom complet du contact principal"""
+        contact = obj.contacts.filter(contact_principal_devis=True).first() or obj.contacts.first()
+        if contact:
+            return f"{contact.prenom} {contact.nom}"
+        return ""
+    
+    def get_email(self, obj):
+        """Récupère l'email du contact principal"""
+        contact = obj.contacts.filter(contact_principal_devis=True).first() or obj.contacts.first()
+        return contact.email if contact else ""
+    
+    def get_phone(self, obj):
+        """Récupère le téléphone du contact principal"""
+        contact = obj.contacts.filter(contact_principal_devis=True).first() or obj.contacts.first()
+        return contact.telephone if contact else ""
+    
+    def get_address(self, obj):
+        """Récupère l'adresse principale formatée"""
+        adresse = obj.adresses.filter(facturation=True).first() or obj.adresses.first()
+        if adresse:
+            return f"{adresse.rue}, {adresse.code_postal} {adresse.ville}"
+        return ""
+    
+    def get_status(self, obj):
+        """Renvoie le statut sous forme de chaîne"""
+        return "inactive" if obj.is_deleted else "active"
