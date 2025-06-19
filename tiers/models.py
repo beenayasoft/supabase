@@ -18,7 +18,19 @@ class Tiers(models.Model):
         (TYPE_PARTICULIER, _('Particulier')),
     ]
     
-    # Flags pour catégoriser les tiers
+    # Relations pour catégoriser les tiers (nouveau système)
+    RELATION_PROSPECT = 'prospect'
+    RELATION_CLIENT = 'client'
+    RELATION_FOURNISSEUR = 'fournisseur'
+    RELATION_SOUS_TRAITANT = 'sous_traitant'
+    RELATION_CHOICES = [
+        (RELATION_CLIENT, _('Client')),
+        (RELATION_PROSPECT, _('Prospect')),
+        (RELATION_FOURNISSEUR, _('Fournisseur')),
+        (RELATION_SOUS_TRAITANT, _('Sous-traitant')),
+    ]
+    
+    # Flags pour catégoriser les tiers (DEPRECATED - à supprimer après migration)
     FLAG_PROSPECT = 'prospect'
     FLAG_CLIENT = 'client'
     FLAG_FOURNISSEUR = 'fournisseur'
@@ -40,7 +52,18 @@ class Tiers(models.Model):
     tva = models.CharField(max_length=20, blank=True, null=True, verbose_name=_('Numéro TVA'))
     
     # Catégorisation et attribution
-    flags = models.JSONField(default=list, blank=True, help_text=_('Liste des flags: prospect, client, fournisseur, etc.'))
+    relation = models.CharField(
+        max_length=20, 
+        choices=RELATION_CHOICES, 
+        default=RELATION_PROSPECT,
+        verbose_name=_('Relation'),
+        help_text=_('Type de relation principale avec ce tier')
+    )
+    flags = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text=_('DEPRECATED: Liste des flags: prospect, client, fournisseur, etc. Utiliser le champ "relation" à la place.')
+    )
     assigned_user = models.ForeignKey(
         User, 
         on_delete=models.SET_NULL, 
@@ -62,7 +85,8 @@ class Tiers(models.Model):
         ordering = ['-date_creation']
         indexes = [
             models.Index(fields=['type']),
-            models.Index(fields=['flags']),
+            models.Index(fields=['relation']),
+            models.Index(fields=['flags']),  # Garder temporairement pour la compatibilité
             models.Index(fields=['assigned_user']),
             models.Index(fields=['is_deleted']),
             models.Index(fields=['date_creation']),
@@ -70,6 +94,61 @@ class Tiers(models.Model):
     
     def __str__(self):
         return f"{self.nom} ({self.get_type_display()})"
+    
+    @property
+    def relation_display(self):
+        """Retourne l'affichage de la relation principale"""
+        return self.get_relation_display()
+    
+    @property
+    def is_client(self):
+        """Vérifie si le tier est un client"""
+        return self.relation == self.RELATION_CLIENT
+    
+    @property 
+    def is_prospect(self):
+        """Vérifie si le tier est un prospect"""
+        return self.relation == self.RELATION_PROSPECT
+    
+    @property
+    def is_fournisseur(self):
+        """Vérifie si le tier est un fournisseur"""
+        return self.relation == self.RELATION_FOURNISSEUR
+    
+    @property
+    def is_sous_traitant(self):
+        """Vérifie si le tier est un sous-traitant"""
+        return self.relation == self.RELATION_SOUS_TRAITANT
+    
+    def get_legacy_flags(self):
+        """
+        DEPRECATED: Retourne les flags sous forme de liste pour compatibilité
+        Cette méthode sera supprimée après la migration complète
+        """
+        return [self.relation] if self.relation else ['prospect']
+    
+    def migrate_flags_to_relation(self):
+        """
+        Méthode pour migrer manuellement les flags vers relation
+        Utilisée principalement pour les tests et la migration de données
+        """
+        if not self.flags:
+            self.relation = self.RELATION_PROSPECT
+            return
+        
+        # Priorité de migration
+        priority = {
+            'client': 1,
+            'fournisseur': 2, 
+            'sous_traitant': 3,
+            'prospect': 4
+        }
+        
+        valid_flags = [flag for flag in self.flags if flag in priority]
+        if valid_flags:
+            self.relation = min(valid_flags, key=lambda x: priority[x])
+        else:
+            self.relation = self.RELATION_PROSPECT
     
     def delete(self, using=None, keep_parents=False):
         """Soft delete - marquer comme archivé au lieu de supprimer"""

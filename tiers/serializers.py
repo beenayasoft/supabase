@@ -49,11 +49,13 @@ class TiersListSerializer(serializers.ModelSerializer):
     assigned_user = UserSerializer(read_only=True)
     ville_principale = serializers.SerializerMethodField()
     date_derniere_activite = serializers.SerializerMethodField()
+    # Compatibilité : exposer relation comme type principal pour le frontend
+    type_principal = serializers.CharField(source='relation', read_only=True)
     
     class Meta:
         model = Tiers
         fields = [
-            'id', 'nom', 'type', 'flags', 'assigned_user', 
+            'id', 'nom', 'type', 'relation', 'type_principal', 'flags', 'assigned_user', 
             'ville_principale', 'date_derniere_activite', 'date_creation'
         ]
     
@@ -77,11 +79,13 @@ class TiersDetailSerializer(serializers.ModelSerializer):
     adresses = AdresseSerializer(many=True, read_only=True)
     contacts = ContactSerializer(many=True, read_only=True)
     activites = ActiviteTiersSerializer(many=True, read_only=True)
+    # Ajout de propriétés calculées pour faciliter l'utilisation
+    relation_display = serializers.CharField(source='get_relation_display', read_only=True)
     
     class Meta:
         model = Tiers
         fields = [
-            'id', 'type', 'nom', 'siret', 'tva', 'flags', 'assigned_user',
+            'id', 'type', 'nom', 'siret', 'tva', 'relation', 'relation_display', 'flags', 'assigned_user',
             'date_creation', 'date_modification', 'date_archivage',
             'adresses', 'contacts', 'activites'
         ]
@@ -96,10 +100,30 @@ class TiersCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tiers
         fields = [
-            'type', 'nom', 'siret', 'tva', 'flags', 'assigned_user',
+            'type', 'nom', 'siret', 'tva', 'relation', 'flags', 'assigned_user',
             'adresses', 'contacts'
         ]
     
+    def validate(self, data):
+        """Validation pour assurer la cohérence entre relation et flags"""
+        # Si relation est fournie, synchroniser automatiquement les flags pour compatibilité
+        if 'relation' in data:
+            data['flags'] = [data['relation']]
+        # Si seuls les flags sont fournis (compatibilité ascendante), déterminer la relation
+        elif 'flags' in data and data['flags']:
+            priority = {'client': 1, 'fournisseur': 2, 'sous_traitant': 3, 'prospect': 4}
+            valid_flags = [flag for flag in data['flags'] if flag in priority]
+            if valid_flags:
+                data['relation'] = min(valid_flags, key=lambda x: priority[x])
+            else:
+                data['relation'] = 'prospect'
+        # Défaut si aucun des deux n'est fourni
+        elif 'relation' not in data:
+            data['relation'] = 'prospect'
+            data['flags'] = ['prospect']
+        
+        return data
+
     def create(self, validated_data):
         """Créer un tier avec ses adresses et contacts"""
         adresses_data = validated_data.pop('adresses', [])
@@ -190,8 +214,12 @@ class TiersFrontendSerializer(serializers.ModelSerializer):
         ]
     
     def get_type(self, obj):
-        """Renvoie les flags comme type"""
-        return obj.flags if obj.flags else []
+        """Renvoie la relation principale comme type (nouveau système)"""
+        # Nouveau système : retourner la relation unique
+        if hasattr(obj, 'relation') and obj.relation:
+            return [obj.relation]
+        # Fallback vers flags pour compatibilité pendant la transition
+        return obj.flags if obj.flags else ['prospect']
     
     def get_contact(self, obj):
         """Récupère le nom complet du contact principal"""
