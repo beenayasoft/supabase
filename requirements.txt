@@ -7,3 +7,4 @@ drf-spectacular
 python-decouple
 python-dotenv
 psycopg2-binary
+

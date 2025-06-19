@@ -25,6 +25,9 @@ urlpatterns = [
     # API Authentication endpoints
     path("api/auth/", include("authentification.urls")),
     
+    # API Tiers endpoints
+    path("api/tiers/", include("tiers.urls")),
+    
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
