@@ -27,6 +27,9 @@ urlpatterns = [
     
     # API Bibliothèque d'ouvrages
     path("api/library/", include("bibliotheque.urls")),
+
+    # API Tiers endpoints
+    path("api/tiers/", include("tiers.urls")),
     
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

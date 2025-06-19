@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "django_filters",  # Ajout pour le filtrage des données
     "authentification",
     "bibliotheque",  # Ajout de l'application bibliotheque
+    "tiers",
 ]
 
 # Configuration REST Framework
