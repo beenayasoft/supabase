@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_filters",  # Ajout pour le filtrage des données
     "authentification",
+    "tiers",  # Ajout de l'application tiers
     "bibliotheque",  # Ajout de l'application bibliotheque
 ]
 
