@@ -44,7 +44,9 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",  # Ajout pour gérer les tokens révoqués
     "corsheaders",
     "drf_spectacular",
+    "django_filters",  # Ajout pour le filtrage des données
     "authentification",
+    "bibliotheque",  # Ajout de l'application bibliotheque
     "tiers",
 ]
 
@@ -56,6 +58,7 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
 # Configuration CORS
