@@ -25,6 +25,9 @@ urlpatterns = [
     # API Authentication endpoints
     path("api/auth/", include("authentification.urls")),
     
+    # API Bibliothèque d'ouvrages
+    path("api/library/", include("bibliotheque.urls")),
+
     # API Tiers endpoints
     path("api/tiers/", include("tiers.urls")),
     
