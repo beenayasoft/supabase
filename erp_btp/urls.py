@@ -27,6 +27,9 @@ urlpatterns = [
     
     # API Bibliothèque d'ouvrages
     path("api/library/", include("bibliotheque.urls")),
+
+    # API Tiers endpoints
+    path("api/tiers/", include("tiers.urls")),
     
     # API Devis
     path("api/quotes/", include("devis.urls")),
