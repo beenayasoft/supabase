@@ -27,7 +27,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['454b-105-72-56-65.ngrok-free.app', 'localhost']
 
 
 # Application definition
@@ -65,6 +65,8 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8080",  # Votre frontend React
     "http://127.0.0.1:8080",
+    "https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--8080--10996a95.local-credentialless.webcontainer-api.io"
+
 ]
 
 # Si vous avez besoin d'autoriser les credentials (cookies, headers d'authentification)
