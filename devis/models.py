@@ -66,21 +66,39 @@ class Devis(models.Model):
     @property
     def total_ht(self):
         """
-        Calcule le montant total HT du devis.
+        Calcule le montant total HT du devis en sommant les totaux des lots.
         """
-        total = self.lignes.aggregate(
-            total=Sum(F('prix_unitaire') * F('quantite'))
+        from django.db.models import Sum, F
+        
+        # Récupérer toutes les lignes de tous les lots de ce devis
+        lignes_query = LigneDevis.objects.filter(lot__devis=self)
+        
+        # Calculer le total HT
+        total = lignes_query.annotate(
+            total_ligne=F('prix_unitaire') * F('quantite')
+        ).aggregate(
+            total=Sum('total_ligne')
         )['total'] or 0
+        
         return total
     
     @property
     def total_debourse(self):
         """
-        Calcule le montant total du déboursé sec du devis.
+        Calcule le montant total du déboursé sec du devis en sommant les déboursés des lignes.
         """
-        total = self.lignes.aggregate(
-            total=Sum(F('debourse') * F('quantite'))
+        from django.db.models import Sum, F
+        
+        # Récupérer toutes les lignes de tous les lots de ce devis
+        lignes_query = LigneDevis.objects.filter(lot__devis=self)
+        
+        # Calculer le total du déboursé
+        total = lignes_query.annotate(
+            total_debourse_ligne=F('debourse') * F('quantite')
+        ).aggregate(
+            total=Sum('total_debourse_ligne')
         )['total'] or 0
+        
         return total
     
     @property
@@ -245,12 +263,21 @@ class LigneDevis(models.Model):
             # depuis l'ouvrage associé
             self.description = self.ouvrage.nom
             self.unite = self.ouvrage.unite
-            self.debourse = self.ouvrage.debourse_sec
+            
+            # On arrondit le déboursé à 2 décimales
+            from decimal import Decimal, ROUND_HALF_UP
+            debourse = self.ouvrage.debourse_sec
+            self.debourse = round(debourse, 2)
             
             # Par défaut, on initialise le prix unitaire avec une marge de 30%
             # si le déboursé est > 0, sinon on met 0
             if self.debourse > 0:
-                self.prix_unitaire = self.debourse / 0.7  # Marge de 30%
+                # On arrondit à 2 décimales et on s'assure de ne pas dépasser 10 chiffres au total
+                prix = (self.debourse / Decimal('0.7')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                # Vérifier que le nombre ne dépasse pas 10 chiffres au total
+                if len(str(prix).replace('.', '')) > 10:
+                    prix = Decimal('9999999.99')
+                self.prix_unitaire = prix
             else:
                 self.prix_unitaire = 0
         

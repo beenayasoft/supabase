@@ -1,9 +1,36 @@
 from rest_framework import serializers
 from .models import Devis, Lot, LigneDevis
-from tiers.serializers import TiersSerializer
+from tiers.serializers import TiersDetailSerializer as TiersSerializer
 from bibliotheque.serializers import OuvrageSerializer
 
-class LigneDevisSerializer(serializers.ModelSerializer):
+class RoleBasedSerializerMixin:
+    """
+    Mixin pour filtrer les champs selon le rôle de l'utilisateur.
+    """
+    def __init__(self, *args, **kwargs):
+        # Extraire le contexte de requête pour vérifier les permissions
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        
+        # Filtrer les champs si l'utilisateur n'a pas le rôle approprié
+        if request and not self.user_can_view_costs(request.user):
+            cost_fields = ['debourse', 'total_debourse', 'marge', 'marge_totale', 'marge_globale']
+            
+            # Supprimer les champs liés aux coûts
+            for field in cost_fields:
+                if field in self.fields:
+                    self.fields.pop(field)
+    
+    def user_can_view_costs(self, user):
+        """
+        Détermine si l'utilisateur peut voir les informations de coûts et marges.
+        À remplacer par une implémentation réelle basée sur les rôles.
+        """
+        # Pour l'instant, tous les utilisateurs authentifiés peuvent voir les coûts
+        # Dans une implémentation réelle, on vérifierait les rôles (gérant, admin)
+        return user and user.is_authenticated if user else False
+
+class LigneDevisSerializer(RoleBasedSerializerMixin, serializers.ModelSerializer):
     """
     Sérialiseur pour le modèle LigneDevis.
     """
@@ -50,7 +77,7 @@ class LigneDevisCreateSerializer(serializers.ModelSerializer):
         
         return data
 
-class LigneDevisDetailSerializer(serializers.ModelSerializer):
+class LigneDevisDetailSerializer(RoleBasedSerializerMixin, serializers.ModelSerializer):
     """
     Sérialiseur détaillé pour le modèle LigneDevis.
     """
@@ -67,7 +94,7 @@ class LigneDevisDetailSerializer(serializers.ModelSerializer):
             'total_ht', 'total_debourse', 'marge'
         ]
 
-class LotSerializer(serializers.ModelSerializer):
+class LotSerializer(RoleBasedSerializerMixin, serializers.ModelSerializer):
     """
     Sérialiseur pour le modèle Lot.
     """
@@ -82,7 +109,7 @@ class LotSerializer(serializers.ModelSerializer):
             'total_ht', 'total_debourse', 'marge'
         ]
 
-class LotDetailSerializer(serializers.ModelSerializer):
+class LotDetailSerializer(RoleBasedSerializerMixin, serializers.ModelSerializer):
     """
     Sérialiseur détaillé pour le modèle Lot, incluant ses lignes.
     """
@@ -98,7 +125,7 @@ class LotDetailSerializer(serializers.ModelSerializer):
             'lignes', 'total_ht', 'total_debourse', 'marge'
         ]
 
-class DevisSerializer(serializers.ModelSerializer):
+class DevisSerializer(RoleBasedSerializerMixin, serializers.ModelSerializer):
     """
     Sérialiseur pour le modèle Devis.
     """
@@ -121,7 +148,7 @@ class DevisSerializer(serializers.ModelSerializer):
         """
         return obj.client.nom if obj.client else None
 
-class DevisDetailSerializer(serializers.ModelSerializer):
+class DevisDetailSerializer(RoleBasedSerializerMixin, serializers.ModelSerializer):
     """
     Sérialiseur détaillé pour le modèle Devis, incluant ses lots et lignes.
     """
