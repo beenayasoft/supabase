@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invitation à rejoindre Beenaya</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header img {
+            max-width: 150px;
+            height: auto;
+        }
+        .content {
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #1B333F;
+            color: white !important;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .footer {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-top: 30px;
+        }
+        .expiration {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Invitation à rejoindre Beenaya</h1>
+    </div>
+    
+    <div class="content">
+        <p>Bonjour {{ invitation.first_name }},</p>
+        
+        {% if is_resend %}
+        <p><strong>Ceci est un rappel</strong> concernant votre invitation à rejoindre Beenaya.</p>
+        {% endif %}
+        
+        <p>{{ invitation.invited_by.first_name }} {{ invitation.invited_by.last_name }} vous invite à rejoindre l'espace de travail de <strong>{{ invitation.invited_by.company }}</strong> sur la plateforme Beenaya.</p>
+        
+        <p>Pour accepter cette invitation et créer votre compte, veuillez cliquer sur le bouton ci-dessous :</p>
+        
+        <div style="text-align: center;">
+            <a href="{{ invitation_url }}" class="button">Accepter l'invitation</a>
+        </div>
+        
+        <p>Si le bouton ne fonctionne pas, vous pouvez également copier et coller l'URL suivante dans votre navigateur :</p>
+        <p style="word-break: break-all;">{{ invitation_url }}</p>
+        
+        <p class="expiration">Cette invitation expirera le {{ expiration_date }}.</p>
+    </div>
+    
+    <div class="footer">
+        <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+        <p>© {% now "Y" %} Beenaya. Tous droits réservés.</p>
+    </div>
+</body>
+</html> 
