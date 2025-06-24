@@ -139,7 +139,7 @@ class DevisSerializer(RoleBasedSerializerMixin, serializers.ModelSerializer):
         fields = [
             'id', 'client', 'client_nom', 'objet', 'statut', 'numero', 
             'date_creation', 'date_validite', 'commentaire', 'conditions_paiement', 
-            'marge_globale', 'total_ht', 'total_debourse', 'marge_totale'
+            'marge_globale', 'total_ht', 'total_debourse', 'marge_totale', 'opportunity'
         ]
     
     def get_client_nom(self, obj):
@@ -163,7 +163,8 @@ class DevisDetailSerializer(RoleBasedSerializerMixin, serializers.ModelSerialize
         fields = [
             'id', 'client', 'client_details', 'objet', 'statut', 'numero', 
             'date_creation', 'date_validite', 'commentaire', 'conditions_paiement', 
-            'marge_globale', 'lots', 'total_ht', 'total_debourse', 'marge_totale'
+            'marge_globale', 'lots', 'total_ht', 'total_debourse', 'marge_totale',
+            'opportunity'
         ]
 
 class DevisCreateSerializer(serializers.ModelSerializer):
@@ -174,7 +175,7 @@ class DevisCreateSerializer(serializers.ModelSerializer):
         model = Devis
         fields = [
             'client', 'objet', 'statut', 'numero', 'date_validite', 
-            'commentaire', 'conditions_paiement', 'marge_globale'
+            'commentaire', 'conditions_paiement', 'marge_globale', 'opportunity'
         ]
     
     def validate_numero(self, value):
@@ -184,4 +185,66 @@ class DevisCreateSerializer(serializers.ModelSerializer):
         # Vérifie que le numéro est unique
         if Devis.objects.filter(numero=value).exists():
             raise serializers.ValidationError("Ce numéro de devis existe déjà")
-        return value 
+        return value
+
+class DevisFromOpportunitySerializer(serializers.Serializer):
+    """
+    Sérialiseur pour créer un devis à partir d'une opportunité.
+    """
+    opportunity_id = serializers.UUIDField(required=True)
+    numero = serializers.CharField(required=True, max_length=50)
+    date_validite = serializers.DateField(required=False, allow_null=True)
+    commentaire = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    conditions_paiement = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    marge_globale = serializers.DecimalField(required=False, max_digits=5, decimal_places=2, allow_null=True)
+    
+    def validate_numero(self, value):
+        """
+        Validation du numéro de devis.
+        """
+        # Vérifie que le numéro est unique
+        if Devis.objects.filter(numero=value).exists():
+            raise serializers.ValidationError("Ce numéro de devis existe déjà")
+        return value
+    
+    def validate_opportunity_id(self, value):
+        """
+        Validation de l'opportunité.
+        """
+        from opportunite.models import Opportunity
+        try:
+            opportunity = Opportunity.objects.get(pk=value)
+            return value
+        except Opportunity.DoesNotExist:
+            raise serializers.ValidationError("L'opportunité spécifiée n'existe pas")
+        
+    def create(self, validated_data):
+        """
+        Création d'un devis à partir d'une opportunité.
+        """
+        from opportunite.models import Opportunity
+        
+        # Récupérer l'opportunité
+        opportunity = Opportunity.objects.get(pk=validated_data['opportunity_id'])
+        
+        # Créer le devis
+        devis = Devis.objects.create(
+            client=opportunity.tier,
+            objet=f"Devis pour {opportunity.name}",
+            numero=validated_data['numero'],
+            date_validite=validated_data.get('date_validite'),
+            commentaire=validated_data.get('commentaire'),
+            conditions_paiement=validated_data.get('conditions_paiement'),
+            marge_globale=validated_data.get('marge_globale'),
+            opportunity=opportunity
+        )
+        
+        # Créer un lot par défaut
+        Lot.objects.create(
+            devis=devis,
+            nom="Prestations",
+            ordre=1,
+            description=f"Prestations pour {opportunity.name}"
+        )
+        
+        return devis 

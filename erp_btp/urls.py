@@ -34,8 +34,8 @@ urlpatterns = [
     # API Devis
     path("api/quotes/", include("devis.urls")),
     
-    # API Tiers
-    path("api/tiers/", include("tiers.urls")),
+    # API Opportunités
+    path("api/opportunities/", include("opportunite.urls")),
     
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

@@ -3,6 +3,7 @@
 *.pot
 *.pyc
 __pycache__/
+migrations/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -91,6 +92,8 @@ node_modules/
 .env
 .cursor
 .taskmaster
+
+
 
 
 # OS specific

@@ -8,10 +8,12 @@ from .models import Devis, Lot, LigneDevis
 from .serializers import (
     DevisSerializer, DevisDetailSerializer, DevisCreateSerializer,
     LotSerializer, LotDetailSerializer,
-    LigneDevisSerializer, LigneDevisDetailSerializer, LigneDevisCreateSerializer
+    LigneDevisSerializer, LigneDevisDetailSerializer, LigneDevisCreateSerializer,
+    DevisFromOpportunitySerializer
 )
 from bibliotheque.models import Ouvrage
 from decimal import Decimal, ROUND_HALF_UP
+from opportunite.models import Opportunity
 
 class DevisViewSet(viewsets.ModelViewSet):
     """
@@ -27,11 +29,12 @@ class DevisViewSet(viewsets.ModelViewSet):
     Endpoints additionnels:
     - calculations: Retourne les calculs détaillés pour un devis spécifique
     - stats: Retourne des statistiques globales sur les devis
+    - from_opportunity: Crée un devis à partir d'une opportunité
     """
     queryset = Devis.objects.all()
     serializer_class = DevisSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['client', 'statut']
+    filterset_fields = ['client', 'statut', 'opportunity']
     search_fields = ['numero', 'objet', 'client__nom']
     ordering_fields = ['date_creation', 'numero', 'client__nom', 'statut']
     ordering = ['-date_creation']
@@ -44,7 +47,36 @@ class DevisViewSet(viewsets.ModelViewSet):
             return DevisDetailSerializer
         elif self.action == 'create':
             return DevisCreateSerializer
+        elif self.action == 'from_opportunity':
+            return DevisFromOpportunitySerializer
         return DevisSerializer
+    
+    @action(detail=False, methods=['post'])
+    def from_opportunity(self, request):
+        """
+        Crée un devis à partir d'une opportunité.
+        
+        Paramètres requis:
+        - opportunity_id: UUID de l'opportunité
+        - numero: Numéro du devis à créer
+        
+        Paramètres optionnels:
+        - date_validite: Date de validité du devis
+        - commentaire: Commentaire pour le devis
+        - conditions_paiement: Conditions de paiement
+        - marge_globale: Marge globale en pourcentage
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            # Créer le devis
+            devis = serializer.save()
+            
+            # Retourner le devis créé
+            return Response(
+                DevisDetailSerializer(devis, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'])
     def duplicate(self, request, pk=None):
@@ -65,7 +97,8 @@ class DevisViewSet(viewsets.ModelViewSet):
             date_validite=devis.date_validite,
             commentaire=devis.commentaire,
             conditions_paiement=devis.conditions_paiement,
-            marge_globale=devis.marge_globale
+            marge_globale=devis.marge_globale,
+            opportunity=devis.opportunity
         )
         
         # Copier les lots et leurs lignes

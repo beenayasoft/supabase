@@ -55,6 +55,16 @@ class Devis(models.Model):
         verbose_name="Marge globale (%)"
     )
     
+    # Relation avec l'opportunité (si le devis est créé à partir d'une opportunité)
+    opportunity = models.ForeignKey(
+        'opportunite.Opportunity',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='devis',
+        verbose_name="Opportunité"
+    )
+    
     class Meta:
         verbose_name = "Devis"
         verbose_name_plural = "Devis"
