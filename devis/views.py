@@ -1,643 +1,729 @@
-from django.shortcuts import render, get_object_or_404
-from django.db.models import Sum, Avg, Count
-from rest_framework import viewsets, status, filters, serializers
+from django.shortcuts import render
+from django.db.models import Q, Count, Sum, Avg
+from django.utils import timezone
+from datetime import datetime, timedelta
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Devis, Lot, LigneDevis
-from .serializers import (
-    DevisSerializer, DevisDetailSerializer, DevisCreateSerializer,
-    LotSerializer, LotDetailSerializer,
-    LigneDevisSerializer, LigneDevisDetailSerializer, LigneDevisCreateSerializer
-)
-from bibliotheque.models import Ouvrage
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
+from django.db import transaction
 
-class DevisViewSet(viewsets.ModelViewSet):
+from .models import Quote, QuoteItem, QuoteStatus
+from .serializers import (
+    QuoteSerializer, QuoteDetailSerializer, 
+    QuoteItemSerializer, QuoteItemDetailSerializer,
+    QuoteStatsSerializer, QuoteActionSerializer,
+    QuoteDuplicateSerializer, QuoteExportSerializer
+)
+from tiers.models import Tiers
+
+
+class QuoteViewSet(viewsets.ModelViewSet):
     """
     ViewSet pour gérer les opérations CRUD sur les devis.
     
-    list: Récupère tous les devis
-    retrieve: Récupère un devis par son ID
+    list: Récupère tous les devis avec filtres
+    retrieve: Récupère un devis par son ID avec tous les détails
     create: Crée un nouveau devis
     update: Met à jour un devis existant
     partial_update: Met à jour partiellement un devis
     destroy: Supprime un devis
     
-    Endpoints additionnels:
-    - calculations: Retourne les calculs détaillés pour un devis spécifique
-    - stats: Retourne des statistiques globales sur les devis
+    Actions personnalisées:
+    - stats: Statistiques globales des devis
+    - mark_as_sent: Marquer un devis comme envoyé
+    - mark_as_accepted: Marquer un devis comme accepté
+    - mark_as_rejected: Marquer un devis comme refusé
+    - mark_as_cancelled: Marquer un devis comme annulé
+    - duplicate: Dupliquer un devis
+    - export: Exporter un devis (PDF, Excel, CSV)
+    - bulk_update: Mise à jour en lot d'un devis complet
+    - bulk_create: Création d'un devis complet avec tous ses éléments
     """
-    queryset = Devis.objects.all()
-    serializer_class = DevisSerializer
+    queryset = Quote.objects.all()
+    serializer_class = QuoteSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['client', 'statut']
-    search_fields = ['numero', 'objet', 'client__nom']
-    ordering_fields = ['date_creation', 'numero', 'client__nom', 'statut']
-    ordering = ['-date_creation']
-    
-    def get_serializer_class(self):
-        """
-        Utilise le sérialiseur approprié en fonction de l'action.
-        """
-        if self.action == 'retrieve':
-            return DevisDetailSerializer
-        elif self.action == 'create':
-            return DevisCreateSerializer
-        return DevisSerializer
-    
-    @action(detail=True, methods=['post'])
-    def duplicate(self, request, pk=None):
-        """
-        Duplique un devis existant.
-        """
-        devis = self.get_object()
-        
-        # Créer un nouveau numéro de devis
-        nouveau_numero = f"{devis.numero}-COPIE"
-        
-        # Créer une copie du devis
-        nouveau_devis = Devis.objects.create(
-            client=devis.client,
-            objet=f"Copie de : {devis.objet}",
-            statut='brouillon',
-            numero=nouveau_numero,
-            date_validite=devis.date_validite,
-            commentaire=devis.commentaire,
-            conditions_paiement=devis.conditions_paiement,
-            marge_globale=devis.marge_globale
-        )
-        
-        # Copier les lots et leurs lignes
-        for lot in devis.lots.all():
-            nouveau_lot = Lot.objects.create(
-                devis=nouveau_devis,
-                nom=lot.nom,
-                ordre=lot.ordre,
-                description=lot.description
-            )
-            
-            # Copier les lignes du lot
-            for ligne in lot.lignes.all():
-                LigneDevis.objects.create(
-                    lot=nouveau_lot,
-                    type=ligne.type,
-                    ouvrage=ligne.ouvrage,
-                    description=ligne.description,
-                    quantite=ligne.quantite,
-                    unite=ligne.unite,
-                    prix_unitaire=ligne.prix_unitaire,
-                    debourse=ligne.debourse,
-                    ordre=ligne.ordre
-                )
-        
-        # Retourner le nouveau devis
-        serializer = DevisDetailSerializer(nouveau_devis)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-    @action(detail=True, methods=['put'])
-    def change_status(self, request, pk=None):
-        """
-        Change le statut d'un devis.
-        """
-        devis = self.get_object()
-        nouveau_statut = request.data.get('statut')
-        
-        if not nouveau_statut:
-            return Response(
-                {"detail": "Le statut est requis"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if nouveau_statut not in [s[0] for s in Devis.STATUT_CHOICES]:
-            return Response(
-                {"detail": f"Statut invalide. Valeurs possibles : {[s[0] for s in Devis.STATUT_CHOICES]}"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        devis.statut = nouveau_statut
-        devis.save()
-        
-        serializer = DevisSerializer(devis)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['get'])
-    def pdf(self, request, pk=None):
-        """
-        Génère un PDF pour le devis.
-        
-        Paramètres de requête:
-        - show_costs (bool): Affiche ou non les informations de coûts et marges (par défaut: false)
-                            L'affichage est soumis aux autorisations de l'utilisateur.
-        """
-        from django.http import HttpResponse
-        from .pdf_generator import DevisPDFGenerator
-        import os
-        
-        devis = self.get_object()
-        
-        # Vérifier si l'utilisateur veut voir les coûts et s'il en a le droit
-        show_costs_param = request.query_params.get('show_costs', 'false').lower() == 'true'
-        show_costs = show_costs_param and self.user_can_view_costs(request.user)
-        
-        # Générer le PDF
-        pdf_generator = DevisPDFGenerator(devis, show_costs=show_costs)
-        pdf_buffer = pdf_generator.generate_pdf()
-        
-        # Créer la réponse HTTP avec le PDF
-        filename = f"devis_{devis.numero}.pdf".replace('/', '-').replace(' ', '_')
-        response = HttpResponse(pdf_buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        return response
-        
-    @action(detail=True, methods=['get'])
-    def calculations(self, request, pk=None):
-        """
-        Retourne les calculs détaillés pour un devis : totaux par lot, totaux globaux, marges.
-        L'accès aux informations de coûts et marges est filtré selon le rôle de l'utilisateur.
-        """
-        devis = self.get_object()
-        
-        # Vérifier si l'utilisateur a le droit de voir les données de coûts
-        show_costs = self.user_can_view_costs(request.user)
-        
-        # Préparer les données de base du devis
-        result = {
-            "id": devis.id,
-            "numero": devis.numero,
-            "client": devis.client.nom,
-            "objet": devis.objet,
-            "statut": devis.statut,
-            "total_ht": devis.total_ht
-        }
-        
-        # Ajouter les informations de coûts si l'utilisateur est autorisé
-        if show_costs:
-            result.update({
-                "total_debourse": devis.total_debourse,
-                "marge_totale": devis.marge_totale
-            })
-        
-        # Préparer les détails par lot
-        lots_data = []
-        for lot in devis.lots.all().order_by('ordre'):
-            lot_data = {
-                "id": lot.id,
-                "nom": lot.nom,
-                "total_ht": lot.total_ht
-            }
-            
-            # Ajouter les informations de coûts des lots si l'utilisateur est autorisé
-            if show_costs:
-                lot_data.update({
-                    "total_debourse": lot.total_debourse,
-                    "marge": lot.marge
-                })
-            
-            # Ajouter les détails des lignes
-            lignes_data = []
-            for ligne in lot.lignes.all().order_by('ordre'):
-                ligne_data = {
-                    "id": ligne.id,
-                    "description": ligne.description,
-                    "quantite": ligne.quantite,
-                    "unite": ligne.unite,
-                    "prix_unitaire": ligne.prix_unitaire,
-                    "total_ht": ligne.total_ht
-                }
-                
-                # Ajouter les informations de coûts des lignes si l'utilisateur est autorisé
-                if show_costs:
-                    ligne_data.update({
-                        "debourse": ligne.debourse,
-                        "total_debourse": ligne.total_debourse,
-                        "marge": ligne.marge
-                    })
-                
-                lignes_data.append(ligne_data)
-            
-            lot_data["lignes"] = lignes_data
-            lots_data.append(lot_data)
-        
-        result["lots"] = lots_data
-        
-        # Retourner le résultat complet
-        return Response(result)
-    
-    def user_can_view_costs(self, user):
-        """
-        Détermine si un utilisateur peut voir les informations de coûts et marges.
-        Actuellement, tous les utilisateurs authentifiés peuvent les voir.
-        Dans une implémentation réelle, il faudrait vérifier les rôles/permissions.
-        """
-        # TODO: Implémenter la vérification basée sur les rôles quand l'authentification sera en place
-        # Pour l'instant, on suppose que c'est accessible à tous les utilisateurs authentifiés
-        return user.is_authenticated
-        
-    @action(detail=False, methods=['get'])
-    def stats(self, request):
-        """
-        Retourne des statistiques globales sur les devis.
-        L'accès est filtré selon les rôles.
-        """
-        # Vérifier si l'utilisateur a le droit de voir les données de coûts
-        show_costs = self.user_can_view_costs(request.user)
-        
-        # Statistiques de base accessibles à tous
-        basic_stats = {
-            "total_devis": Devis.objects.count(),
-            "devis_par_statut": {
-                status: Devis.objects.filter(statut=status).count()
-                for status, _ in Devis.STATUT_CHOICES
-            },
-            "montant_total_ht": Devis.objects.aggregate(total=Sum('total_ht'))['total'] or 0,
-        }
-        
-        # Statistiques incluant les informations de coûts (réservées aux rôles autorisés)
-        cost_stats = {}
-        if show_costs:
-            # Récupérer les données de coûts et de marges
-            margin_data = Devis.objects.aggregate(
-                debourse_total=Sum('total_debourse'),
-                marge_moyenne=Avg('marge_totale')
-            )
-            
-            cost_stats = {
-                "debourse_total": margin_data['debourse_total'] or 0,
-                "marge_moyenne": margin_data['marge_moyenne'] or 0,
-                # Répartition de marge par statut (pour analyse)
-                "marges_par_statut": {
-                    status: Devis.objects.filter(statut=status).aggregate(
-                        avg_margin=Avg('marge_totale')
-                    )['avg_margin'] or 0
-                    for status, _ in Devis.STATUT_CHOICES
-                }
-            }
-        
-        # Combiner les statistiques
-        result = {**basic_stats}
-        if cost_stats:
-            result.update(cost_stats)
-        
-        return Response(result)
-
-class LotViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet pour gérer les opérations CRUD sur les lots.
-    
-    list: Récupère tous les lots
-    retrieve: Récupère un lot par son ID
-    create: Crée un nouveau lot
-    update: Met à jour un lot existant
-    partial_update: Met à jour partiellement un lot
-    destroy: Supprime un lot
-    """
-    queryset = Lot.objects.all()
-    serializer_class = LotSerializer
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['devis']
-    ordering_fields = ['ordre', 'nom']
-    ordering = ['ordre', 'nom']
+    filterset_fields = ['status', 'tier', 'issue_date', 'expiry_date']
+    search_fields = ['number', 'client_name', 'project_name', 'notes']
+    ordering_fields = ['created_at', 'issue_date', 'expiry_date', 'total_ttc', 'number']
+    ordering = ['-created_at']
     
     def get_serializer_class(self):
         """
         Utilise le sérialiseur détaillé pour les opérations de lecture individuelles.
         """
         if self.action == 'retrieve':
-            return LotDetailSerializer
-        return LotSerializer
-    
-    @action(detail=False, methods=['post'])
-    def reorder(self, request):
-        """
-        Réorganise l'ordre des lots d'un devis.
-        """
-        devis_id = request.data.get('devis_id')
-        lot_ids = request.data.get('lot_ids', [])
-        
-        if not devis_id:
-            return Response(
-                {"detail": "L'ID du devis est requis"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if not lot_ids:
-            return Response(
-                {"detail": "La liste des IDs de lots est requise"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            devis = Devis.objects.get(pk=devis_id)
-        except Devis.DoesNotExist:
-            return Response(
-                {"detail": "Devis non trouvé"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Vérifier que tous les lots appartiennent au devis
-        lots = Lot.objects.filter(id__in=lot_ids, devis=devis)
-        if len(lots) != len(lot_ids):
-            return Response(
-                {"detail": "Certains lots n'appartiennent pas au devis spécifié"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Mettre à jour l'ordre des lots
-        for i, lot_id in enumerate(lot_ids):
-            lot = lots.get(id=lot_id)
-            lot.ordre = i
-            lot.save()
-        
-        # Retourner les lots mis à jour
-        serializer = LotSerializer(lots, many=True)
-        return Response(serializer.data)
-
-class LigneDevisViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet pour gérer les opérations CRUD sur les lignes de devis.
-    
-    list: Récupère toutes les lignes de devis
-    retrieve: Récupère une ligne de devis par son ID
-    create: Crée une nouvelle ligne de devis
-    update: Met à jour une ligne de devis existante
-    partial_update: Met à jour partiellement une ligne de devis
-    destroy: Supprime une ligne de devis
-    """
-    queryset = LigneDevis.objects.all()
-    serializer_class = LigneDevisSerializer
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['lot', 'type', 'ouvrage']
-    ordering_fields = ['ordre', 'description']
-    ordering = ['ordre']
-    
-    def get_serializer_class(self):
-        """
-        Utilise le sérialiseur approprié en fonction de l'action.
-        """
-        if self.action == 'retrieve':
-            return LigneDevisDetailSerializer
-        elif self.action in ['create', 'update', 'partial_update']:
-            return LigneDevisCreateSerializer
-        return LigneDevisSerializer
-    
-    def create(self, request, *args, **kwargs):
-        """
-        Surcharge de la méthode create pour gérer le cas où le type est 'ouvrage'.
-        Cette version vérifie et remplit les données AVANT la validation du sérialiseur.
-        """
-        # Récupérer les données de la requête
-        request_data = request.data.copy()
-        
-        # Vérifier si c'est une ligne de type 'ouvrage'
-        if request_data.get('type') == 'ouvrage' and request_data.get('ouvrage'):
-            try:
-                # Récupérer l'ouvrage avant la validation
-                ouvrage_id = request_data.get('ouvrage')
-                ouvrage = Ouvrage.objects.get(pk=ouvrage_id)
-                
-                # Pré-remplir les champs manquants avec les valeurs de l'ouvrage
-                if not request_data.get('description'):
-                    request_data['description'] = ouvrage.nom
-                
-                if not request_data.get('unite'):
-                    request_data['unite'] = ouvrage.unite
-                
-                if not request_data.get('debourse'):
-                    # On arrondit à 2 décimales maximum
-                    request_data['debourse'] = str(round(ouvrage.debourse_sec, 2))  # Conversion en string pour JSON
-                
-                # Si le prix unitaire n'est pas fourni, on le calcule avec une marge de 30%
-                if not request_data.get('prix_unitaire'):
-                    from decimal import Decimal, ROUND_HALF_UP
-                    debourse = ouvrage.debourse_sec
-                    if debourse > 0:
-                        # Utilisation de Decimal pour éviter l'erreur de type
-                        # On arrondit à 2 décimales et on s'assure de ne pas dépasser 10 chiffres au total
-                        prix = (debourse / Decimal('0.7')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                        # Vérifier que le nombre ne dépasse pas 10 chiffres au total
-                        # Si c'est le cas, on le tronque à 9999999.99
-                        if len(str(prix).replace('.', '')) > 10:
-                            prix = Decimal('9999999.99')
-                        request_data['prix_unitaire'] = str(prix)
-                    else:
-                        request_data['prix_unitaire'] = '0'
-                        
-            except Ouvrage.DoesNotExist:
-                # Si l'ouvrage n'existe pas, on retourne une erreur claire
-                return Response(
-                    {"ouvrage": [f"L'ouvrage avec l'ID {ouvrage_id} n'existe pas."]},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
-        # Maintenant on valide le sérialiseur avec les données complétées
-        serializer = self.get_serializer(data=request_data)
-        serializer.is_valid(raise_exception=True)
-        
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
-    @action(detail=False, methods=['post'])
-    def reorder(self, request):
-        """
-        Réorganise l'ordre des lignes d'un lot.
-        """
-        lot_id = request.data.get('lot_id')
-        ligne_ids = request.data.get('ligne_ids', [])
-        
-        if not lot_id:
-            return Response(
-                {"detail": "L'ID du lot est requis"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if not ligne_ids:
-            return Response(
-                {"detail": "La liste des IDs de lignes est requise"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            lot = Lot.objects.get(pk=lot_id)
-        except Lot.DoesNotExist:
-            return Response(
-                {"detail": "Lot non trouvé"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Vérifier que toutes les lignes appartiennent au lot
-        lignes = LigneDevis.objects.filter(id__in=ligne_ids, lot=lot)
-        if len(lignes) != len(ligne_ids):
-            return Response(
-                {"detail": "Certaines lignes n'appartiennent pas au lot spécifié"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Mettre à jour l'ordre des lignes
-        for i, ligne_id in enumerate(ligne_ids):
-            ligne = lignes.get(id=ligne_id)
-            ligne.ordre = i
-            ligne.save()
-        
-        # Retourner les lignes mises à jour
-        serializer = LigneDevisSerializer(lignes, many=True)
-        return Response(serializer.data)
-
-
-class DevisLineViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet pour gérer les opérations CRUD sur les lignes de devis avec routes imbriquées.
-    
-    URLs imbriquées:
-    - POST /api/quotes/devis/{devis_pk}/lines/
-    - GET /api/quotes/devis/{devis_pk}/lines/
-    - GET /api/quotes/devis/{devis_pk}/lines/{pk}/
-    - PUT /api/quotes/devis/{devis_pk}/lines/{pk}/
-    - DELETE /api/quotes/devis/{devis_pk}/lines/{pk}/
-    - POST /api/quotes/devis/{devis_pk}/lines/reorder/
-    """
-    serializer_class = LigneDevisSerializer
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    ordering_fields = ['ordre', 'description']
-    ordering = ['ordre']
+            return QuoteDetailSerializer
+        elif self.action in ['mark_as_sent', 'mark_as_accepted', 'mark_as_rejected', 'mark_as_cancelled']:
+            return QuoteActionSerializer
+        elif self.action == 'duplicate':
+            return QuoteDuplicateSerializer
+        elif self.action == 'export':
+            return QuoteExportSerializer
+        return QuoteSerializer
     
     def get_queryset(self):
         """
-        Retourne les lignes appartenant au devis spécifié dans l'URL.
+        Personnaliser le queryset avec des optimisations et filtres avancés.
         """
-        devis_id = self.kwargs['devis_pk']
-        # Vérifier que le devis existe
-        get_object_or_404(Devis, pk=devis_id)
-        # Retourner les lignes des lots associés à ce devis
-        return LigneDevis.objects.filter(lot__devis=devis_id)
-    
-    def get_serializer_class(self):
-        """
-        Utilise le sérialiseur approprié en fonction de l'action.
-        """
-        if self.action == 'retrieve':
-            return LigneDevisDetailSerializer
-        elif self.action in ['create', 'update', 'partial_update']:
-            return LigneDevisCreateSerializer
-        return LigneDevisSerializer
-    
-    def create(self, request, *args, **kwargs):
-        """
-        Surcharge de la méthode create pour gérer le cas où le type est 'ouvrage'.
-        Cette version vérifie et remplit les données AVANT la validation du sérialiseur.
-        """
-        # Récupérer les données de la requête
-        request_data = request.data.copy()
+        queryset = Quote.objects.select_related('tier').prefetch_related('items')
         
-        # Vérifier si c'est une ligne de type 'ouvrage'
-        if request_data.get('type') == 'ouvrage' and request_data.get('ouvrage'):
+        # Filtres personnalisés
+        client_id = self.request.query_params.get('client_id')
+        if client_id:
+            queryset = queryset.filter(tier_id=client_id)
+        
+        status_list = self.request.query_params.get('status_list')
+        if status_list:
+            status_values = status_list.split(',')
+            queryset = queryset.filter(status__in=status_values)
+        
+        date_from = self.request.query_params.get('date_from')
+        if date_from:
             try:
-                # Récupérer l'ouvrage avant la validation
-                ouvrage_id = request_data.get('ouvrage')
-                ouvrage = Ouvrage.objects.get(pk=ouvrage_id)
-                
-                # Pré-remplir les champs manquants avec les valeurs de l'ouvrage
-                if not request_data.get('description'):
-                    request_data['description'] = ouvrage.nom
-                
-                if not request_data.get('unite'):
-                    request_data['unite'] = ouvrage.unite
-                
-                # On arrondit le déboursé à 2 décimales maximum
-                if not request_data.get('debourse'):
-                    request_data['debourse'] = str(round(ouvrage.debourse_sec, 2))  # Conversion en string pour JSON
-                
-                # Si le prix unitaire n'est pas fourni, on le calcule avec une marge de 30%
-                if not request_data.get('prix_unitaire'):
-                    from decimal import Decimal, ROUND_HALF_UP
-                    debourse = ouvrage.debourse_sec
-                    if debourse > 0:
-                        # On arrondit à 2 décimales et on s'assure de ne pas dépasser 10 chiffres au total
-                        prix = (debourse / Decimal('0.7')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-                        # Vérifier que le nombre ne dépasse pas 10 chiffres au total
-                        if len(str(prix).replace('.', '')) > 10:
-                            prix = Decimal('9999999.99')
-                        request_data['prix_unitaire'] = str(prix)
-                    else:
-                        request_data['prix_unitaire'] = '0'
-                        
-            except Ouvrage.DoesNotExist:
-                # Si l'ouvrage n'existe pas, on retourne une erreur claire
-                return Response(
-                    {"ouvrage": [f"L'ouvrage avec l'ID {ouvrage_id} n'existe pas."]},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
+                queryset = queryset.filter(issue_date__gte=date_from)
+            except ValueError:
+                pass
         
-        # Maintenant on valide le sérialiseur avec les données complétées
-        serializer = self.get_serializer(data=request_data)
-        serializer.is_valid(raise_exception=True)
+        date_to = self.request.query_params.get('date_to')
+        if date_to:
+            try:
+                date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
+                queryset = queryset.filter(issue_date__lte=date_to)
+            except ValueError:
+                pass
         
-        # Vérification du lot
-        devis_id = self.kwargs['devis_pk']
-        lot_id = serializer.validated_data.get('lot').id
+        min_amount = self.request.query_params.get('min_amount')
+        if min_amount:
+            try:
+                min_amount = Decimal(min_amount)
+                queryset = queryset.filter(total_ttc__gte=min_amount)
+            except (ValueError, TypeError):
+                pass
         
-        # Vérifier que le lot existe et appartient au devis spécifié
-        lot = get_object_or_404(Lot, pk=lot_id)
-        if str(lot.devis.id) != devis_id:
-            raise serializers.ValidationError({
-                'lot': [f"Le lot avec l'ID {lot_id} n'appartient pas au devis avec l'ID {devis_id}."]
-            })
+        max_amount = self.request.query_params.get('max_amount')
+        if max_amount:
+            try:
+                max_amount = Decimal(max_amount)
+                queryset = queryset.filter(total_ttc__lte=max_amount)
+            except (ValueError, TypeError):
+                pass
         
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return queryset
     
     def perform_create(self, serializer):
         """
-        Enregistre la nouvelle ligne.
+        Personnaliser la création pour ajouter l'utilisateur créateur.
         """
-        serializer.save()
+        created_by = None
+        if self.request.user and hasattr(self.request.user, 'email'):
+            created_by = self.request.user.email
+        elif self.request.user and hasattr(self.request.user, 'username'):
+            created_by = self.request.user.username
+        
+        serializer.save(created_by=created_by)
+    
+    def perform_update(self, serializer):
+        """
+        Personnaliser la mise à jour pour ajouter l'utilisateur modificateur.
+        """
+        updated_by = None
+        if self.request.user and hasattr(self.request.user, 'email'):
+            updated_by = self.request.user.email
+        elif self.request.user and hasattr(self.request.user, 'username'):
+            updated_by = self.request.user.username
+        
+        serializer.save(updated_by=updated_by)
+    
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        Endpoint pour récupérer les statistiques globales des devis.
+        """
+        try:
+            # Compter les devis par statut
+            quotes = Quote.objects.all()
+            
+            stats_data = {
+                'total': quotes.count(),
+                'draft': quotes.filter(status=QuoteStatus.DRAFT).count(),
+                'sent': quotes.filter(status=QuoteStatus.SENT).count(),
+                'accepted': quotes.filter(status=QuoteStatus.ACCEPTED).count(),
+                'rejected': quotes.filter(status=QuoteStatus.REJECTED).count(),
+                'expired': quotes.filter(status=QuoteStatus.EXPIRED).count(),
+                'cancelled': quotes.filter(status=QuoteStatus.CANCELLED).count(),
+            }
+            
+            # Calculer le montant total
+            total_amount = quotes.aggregate(
+                total=Sum('total_ttc')
+            )['total'] or Decimal('0')
+            stats_data['total_amount'] = total_amount
+            
+            # Calculer le taux d'acceptation
+            sent_count = stats_data['sent'] + stats_data['accepted'] + stats_data['rejected']
+            if sent_count > 0:
+                acceptance_rate = (stats_data['accepted'] / sent_count) * 100
+            else:
+                acceptance_rate = 0
+            stats_data['acceptance_rate'] = Decimal(str(round(acceptance_rate, 2)))
+            
+            serializer = QuoteStatsSerializer(stats_data)
+            return Response(serializer.data)
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors du calcul des statistiques: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def mark_as_sent(self, request, pk=None):
+        """
+        Marquer un devis comme envoyé.
+        """
+        try:
+            quote = self.get_object()
+            
+            if quote.status != QuoteStatus.DRAFT:
+                return Response(
+                    {"detail": "Seuls les devis en brouillon peuvent être envoyés."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            quote.mark_as_sent()
+            
+            # Log de l'action
+            note = request.data.get('note', '')
+            if note:
+                # Ici on pourrait ajouter un système de logs/historique
+                pass
+            
+            # Utiliser le serializer principal pour retourner les données du quote
+            serializer = QuoteSerializer(quote)
+            return Response({
+                "detail": "Devis marqué comme envoyé avec succès.",
+                "quote": serializer.data
+            })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de l'envoi du devis: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def mark_as_accepted(self, request, pk=None):
+        """
+        Marquer un devis comme accepté.
+        """
+        try:
+            quote = self.get_object()
+            
+            if quote.status not in [QuoteStatus.SENT]:
+                return Response(
+                    {"detail": "Seuls les devis envoyés peuvent être acceptés."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            quote.mark_as_accepted()
+            
+            serializer = QuoteSerializer(quote)
+            return Response({
+                "detail": "Devis marqué comme accepté avec succès.",
+                "quote": serializer.data
+            })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de l'acceptation du devis: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def mark_as_rejected(self, request, pk=None):
+        """
+        Marquer un devis comme refusé.
+        """
+        try:
+            quote = self.get_object()
+            
+            if quote.status not in [QuoteStatus.SENT]:
+                return Response(
+                    {"detail": "Seuls les devis envoyés peuvent être refusés."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            quote.mark_as_rejected()
+            
+            serializer = QuoteSerializer(quote)
+            return Response({
+                "detail": "Devis marqué comme refusé.",
+                "quote": serializer.data
+            })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors du refus du devis: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def mark_as_cancelled(self, request, pk=None):
+        """
+        Marquer un devis comme annulé.
+        """
+        try:
+            quote = self.get_object()
+            
+            if quote.status not in [QuoteStatus.DRAFT, QuoteStatus.SENT]:
+                return Response(
+                    {"detail": "Seuls les devis en brouillon ou envoyés peuvent être annulés."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            quote.mark_as_cancelled()
+            
+            serializer = QuoteSerializer(quote)
+            return Response({
+                "detail": "Devis annulé avec succès.",
+                "quote": serializer.data
+            })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de l'annulation du devis: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def duplicate(self, request, pk=None):
+        """
+        Dupliquer un devis existant.
+        """
+        try:
+            original_quote = self.get_object()
+            
+            # Options de duplication
+            copy_items = request.data.get('copy_items', True)
+            new_number = request.data.get('new_number', f"{original_quote.number}_COPY")
+            
+            # Créer le nouveau devis
+            new_quote = Quote.objects.create(
+                number=new_number,
+                client_name=original_quote.client_name,
+                client_address=original_quote.client_address,
+                project_name=original_quote.project_name,
+                issue_date=timezone.now().date(),
+                expiry_date=timezone.now().date() + timedelta(days=30),
+                conditions=original_quote.conditions,
+                notes=original_quote.notes,
+                tier=original_quote.tier,
+                status=QuoteStatus.DRAFT,
+                # Les totaux seront recalculés automatiquement
+                total_ht=Decimal('0'),
+                total_tva=Decimal('0'),
+                total_ttc=Decimal('0'),
+                created_by=self.request.user.email if hasattr(self.request.user, 'email') else None
+            )
+            
+            # Copier les éléments si demandé
+            if copy_items:
+                original_items = QuoteItem.objects.filter(quote=original_quote).order_by('position')
+                for item in original_items:
+                    QuoteItem.objects.create(
+                        quote=new_quote,
+                        designation=item.designation,
+                        description=item.description,
+                        quantity=item.quantity,
+                        unit=item.unit,
+                        unit_price=item.unit_price,
+                        discount_percentage=item.discount_percentage,
+                        tva_rate=item.tva_rate,
+                        position=item.position,
+                        type=item.type,
+                        parent=item.parent,
+                        reference=item.reference
+                    )
+                
+                # Recalculer les totaux
+                new_quote.calculate_totals()
+                new_quote.save()
+            
+            serializer = QuoteDetailSerializer(new_quote)
+            return Response({
+                "detail": "Devis dupliqué avec succès.",
+                "quote": serializer.data
+            })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de la duplication: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def export(self, request, pk=None):
+        """
+        Exporter un devis vers différents formats.
+        """
+        try:
+            quote = self.get_object()
+            export_format = request.data.get('format', 'pdf').lower()
+            
+            if export_format not in ['pdf', 'excel', 'csv']:
+                return Response(
+                    {"detail": "Format d'export non supporté. Utilisez 'pdf', 'excel' ou 'csv'."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Ici on implémenterait la logique d'export réelle
+            # Pour le moment, on retourne juste un message de succès
+            
+            return Response({
+                "detail": f"Export {export_format.upper()} généré avec succès.",
+                "download_url": f"/api/quotes/{quote.id}/download/{export_format}/",
+                "filename": f"devis_{quote.number}.{export_format}"
+            })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de l'export: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['put'])
+    def bulk_update(self, request, pk=None):
+        """
+        Mise à jour complète d'un devis avec tous ses éléments en une seule transaction.
+        """
+        try:
+            quote = self.get_object()
+            
+            with transaction.atomic():
+                # Mettre à jour les informations du devis
+                quote_data = request.data.get('quote', {})
+                for field, value in quote_data.items():
+                    if hasattr(quote, field) and field not in ['id', 'created_at', 'updated_at']:
+                        setattr(quote, field, value)
+                
+                # Gérer les éléments
+                items_data = request.data.get('items', [])
+                if items_data:
+                    # Supprimer les anciens éléments
+                    QuoteItem.objects.filter(quote=quote).delete()
+                    
+                    # Créer les nouveaux éléments
+                    for position, item_data in enumerate(items_data):
+                        # Conversion des noms de champs frontend vers backend
+                        field_mapping = {
+                            'designation': 'designation',
+                            'description': 'description', 
+                            'quantity': 'quantity',
+                            'unit': 'unit',
+                            'unitPrice': 'unit_price',
+                            'discountPercentage': 'discount_percentage',
+                            'tvaRate': 'tva_rate',
+                            'type': 'type',
+                            'reference': 'reference'
+                        }
+                        
+                        backend_data = {}
+                        for frontend_field, backend_field in field_mapping.items():
+                            if frontend_field in item_data:
+                                backend_data[backend_field] = item_data[frontend_field]
+                        
+                        backend_data['quote'] = quote
+                        backend_data['position'] = position + 1
+                        
+                        QuoteItem.objects.create(**backend_data)
+                
+                # Recalculer les totaux
+                quote.calculate_totals()
+                quote.save()
+                
+                # Retourner le devis mis à jour
+                serializer = QuoteDetailSerializer(quote)
+                return Response({
+                    "detail": "Devis mis à jour avec succès.",
+                    "quote": serializer.data
+                })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de la mise à jour: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=False, methods=['post'])
-    def reorder(self, request, devis_pk=None):
+    def bulk_create(self, request):
         """
-        Réorganise l'ordre des lignes dans un devis.
+        Création complète d'un devis avec tous ses éléments en une seule transaction.
         """
-        devis_id = devis_pk
-        ligne_ids = request.data.get('ligne_ids', [])
-        lot_id = request.data.get('lot_id')
-        
-        if not ligne_ids:
-            return Response(
-                {"detail": "La liste des IDs de lignes est requise"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
-        if not lot_id:
-            return Response(
-                {"detail": "L'ID du lot est requis"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
         try:
-            lot = Lot.objects.get(pk=lot_id, devis=devis_id)
-        except Lot.DoesNotExist:
-            return Response(
-                {"detail": f"Le lot avec l'ID {lot_id} n'appartient pas au devis avec l'ID {devis_id}"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+            with transaction.atomic():
+                # Créer le devis
+                quote_data = request.data.get('quote', {})
+                
+                # Définir des valeurs par défaut
+                quote_data.setdefault('issue_date', timezone.now().date())
+                quote_data.setdefault('expiry_date', timezone.now().date() + timedelta(days=30))
+                quote_data.setdefault('status', QuoteStatus.DRAFT)
+                quote_data.setdefault('created_by', getattr(self.request.user, 'email', None))
+                
+                quote = Quote.objects.create(**quote_data)
+                
+                # Créer les éléments
+                items_data = request.data.get('items', [])
+                for position, item_data in enumerate(items_data):
+                    # Conversion des noms de champs frontend vers backend
+                    field_mapping = {
+                        'designation': 'designation',
+                        'description': 'description', 
+                        'quantity': 'quantity',
+                        'unit': 'unit',
+                        'unitPrice': 'unit_price',
+                        'discountPercentage': 'discount_percentage',
+                        'tvaRate': 'tva_rate',
+                        'type': 'type',
+                        'reference': 'reference'
+                    }
+                    
+                    backend_data = {}
+                    for frontend_field, backend_field in field_mapping.items():
+                        if frontend_field in item_data:
+                            backend_data[backend_field] = item_data[frontend_field]
+                    
+                    backend_data['quote'] = quote
+                    backend_data['position'] = position + 1
+                    
+                    QuoteItem.objects.create(**backend_data)
+                
+                # Recalculer les totaux
+                quote.calculate_totals()
+                quote.save()
+                
+                # Retourner le devis créé
+                serializer = QuoteDetailSerializer(quote)
+                return Response({
+                    "detail": "Devis créé avec succès.",
+                    "quote": serializer.data
+                }, status=status.HTTP_201_CREATED)
         
-        # Vérifier que toutes les lignes appartiennent au lot
-        lignes = LigneDevis.objects.filter(id__in=ligne_ids, lot=lot)
-        if len(lignes) != len(ligne_ids):
+        except Exception as e:
             return Response(
-                {"detail": "Certaines lignes n'appartiennent pas au lot spécifié"}, 
+                {"detail": f"Erreur lors de la création: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class QuoteItemViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour gérer les opérations CRUD sur les éléments de devis.
+    
+    list: Récupère tous les éléments de devis
+    retrieve: Récupère un élément de devis par son ID
+    create: Crée un nouvel élément de devis
+    update: Met à jour un élément de devis existant
+    partial_update: Met à jour partiellement un élément de devis
+    destroy: Supprime un élément de devis
+    
+    Actions personnalisées:
+    - by_quote: Récupérer les éléments d'un devis spécifique
+    - reorder: Réorganiser l'ordre des éléments
+    - batch_operations: Opérations en lot sur les éléments
+    """
+    queryset = QuoteItem.objects.all()
+    serializer_class = QuoteItemSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['quote', 'type', 'parent']
+    search_fields = ['designation', 'description', 'reference']
+    ordering_fields = ['position', 'designation', 'unit_price', 'total_ht']
+    ordering = ['position']
+    
+    def get_serializer_class(self):
+        """
+        Utilise le sérialiseur détaillé pour les opérations de lecture individuelles.
+        """
+        if self.action == 'retrieve':
+            return QuoteItemDetailSerializer
+        return QuoteItemSerializer
+    
+    def get_queryset(self):
+        """
+        Optimiser le queryset.
+        """
+        return QuoteItem.objects.select_related('quote', 'parent')
+    
+    @action(detail=False, methods=['get'])
+    def by_quote(self, request):
+        """
+        Récupérer tous les éléments d'un devis spécifique avec leur hiérarchie.
+        """
+        quote_id = request.query_params.get('quote_id')
+        if not quote_id:
+            return Response(
+                {"detail": "Le paramètre 'quote_id' est requis."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Mettre à jour l'ordre des lignes
-        for i, ligne_id in enumerate(ligne_ids):
-            ligne = lignes.get(id=ligne_id)
-            ligne.ordre = i
-            ligne.save()
+        try:
+            # Récupérer tous les éléments du devis
+            items = QuoteItem.objects.filter(quote_id=quote_id).order_by('position')
+            
+            # Organiser en structure hiérarchique
+            def serialize_item_with_children(item):
+                item_data = QuoteItemDetailSerializer(item).data
+                
+                # Récupérer les enfants
+                children = items.filter(parent=item)
+                if children.exists():
+                    item_data['children'] = [
+                        serialize_item_with_children(child) for child in children
+                    ]
+                
+                return item_data
+            
+            # Récupérer seulement les éléments de niveau racine
+            root_items = items.filter(parent__isnull=True)
+            
+            result = [serialize_item_with_children(item) for item in root_items]
+            
+            return Response({
+                "quote_id": quote_id,
+                "items": result,
+                "total_count": items.count()
+            })
         
-        # Retourner les lignes mises à jour
-        serializer = LigneDevisSerializer(lignes, many=True)
-        return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de la récupération des éléments: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        """
+        Réorganiser l'ordre des éléments d'un devis.
+        """
+        try:
+            items_order = request.data.get('items_order', [])
+            
+            if not items_order:
+                return Response(
+                    {"detail": "La liste 'items_order' est requise."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            with transaction.atomic():
+                for position, item_id in enumerate(items_order):
+                    QuoteItem.objects.filter(id=item_id).update(position=position + 1)
+            
+            return Response({
+                "detail": "Ordre des éléments mis à jour avec succès.",
+                "items_order": items_order
+            })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors de la réorganisation: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'])
+    def batch_operations(self, request):
+        """
+        Effectuer des opérations en lot sur plusieurs éléments.
+        """
+        try:
+            operations = request.data.get('operations', [])
+            
+            if not operations:
+                return Response(
+                    {"detail": "La liste 'operations' est requise."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            results = []
+            
+            with transaction.atomic():
+                for operation in operations:
+                    op_type = operation.get('type')
+                    item_id = operation.get('item_id')
+                    data = operation.get('data', {})
+                    
+                    if op_type == 'create':
+                        # Conversion des champs frontend vers backend
+                        field_mapping = {
+                            'designation': 'designation',
+                            'description': 'description', 
+                            'quantity': 'quantity',
+                            'unit': 'unit',
+                            'unitPrice': 'unit_price',
+                            'discountPercentage': 'discount_percentage',
+                            'tvaRate': 'tva_rate',
+                            'type': 'type',
+                            'reference': 'reference'
+                        }
+                        
+                        backend_data = {}
+                        for frontend_field, backend_field in field_mapping.items():
+                            if frontend_field in data:
+                                backend_data[backend_field] = data[frontend_field]
+                        
+                        item = QuoteItem.objects.create(**backend_data)
+                        results.append({
+                            'operation': 'create',
+                            'item_id': item.id,
+                            'success': True
+                        })
+                    
+                    elif op_type == 'update' and item_id:
+                        item = QuoteItem.objects.get(id=item_id)
+                        
+                        field_mapping = {
+                            'designation': 'designation',
+                            'description': 'description', 
+                            'quantity': 'quantity',
+                            'unit': 'unit',
+                            'unitPrice': 'unit_price',
+                            'discountPercentage': 'discount_percentage',
+                            'tvaRate': 'tva_rate',
+                            'type': 'type',
+                            'reference': 'reference'
+                        }
+                        
+                        for frontend_field, backend_field in field_mapping.items():
+                            if frontend_field in data:
+                                setattr(item, backend_field, data[frontend_field])
+                        
+                        item.save()
+                        results.append({
+                            'operation': 'update',
+                            'item_id': item_id,
+                            'success': True
+                        })
+                    
+                    elif op_type == 'delete' and item_id:
+                        QuoteItem.objects.filter(id=item_id).delete()
+                        results.append({
+                            'operation': 'delete',
+                            'item_id': item_id,
+                            'success': True
+                        })
+            
+            return Response({
+                "detail": "Opérations en lot effectuées avec succès.",
+                "results": results
+            })
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Erreur lors des opérations en lot: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -19,11 +19,12 @@ class Categorie(models.Model):
         related_name='sous_categories',
         verbose_name="Catégorie parente"
     )
+    position = models.PositiveIntegerField(default=0, verbose_name="Position d'affichage")
     
     class Meta:
         verbose_name = "Catégorie"
         verbose_name_plural = "Catégories"
-        ordering = ['nom']
+        ordering = ['position', 'nom']
     
     def __str__(self):
         return self.nom
@@ -63,6 +64,32 @@ class Fourniture(models.Model):
         null=True, 
         verbose_name="Référence"
     )
+    supplier = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True, 
+        verbose_name="Fournisseur"
+    )
+    vat_rate = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=20.0,
+        verbose_name="Taux TVA (%)"
+    )
+    # Nouveaux champs manquants pour cohérence frontend
+    type = models.CharField(
+        max_length=20,
+        default="material",
+        verbose_name="Type"
+    )
+    code = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name="Code"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, verbose_name="Créé le")
+    updated_at = models.DateTimeField(auto_now=True, null=True, verbose_name="Mis à jour le")
     
     class Meta:
         verbose_name = "Fourniture"
@@ -71,6 +98,16 @@ class Fourniture(models.Model):
     
     def __str__(self):
         return f"{self.nom} ({self.unite})"
+    
+    @property
+    def unitPrice(self):
+        """Alias pour prix_achat_ht (compatibilité frontend)"""
+        return self.prix_achat_ht
+    
+    @property
+    def vatRate(self):
+        """Alias pour vat_rate (compatibilité frontend)"""
+        return float(self.vat_rate)
 
 class MainOeuvre(models.Model):
     """
@@ -91,6 +128,25 @@ class MainOeuvre(models.Model):
         verbose_name="Catégorie"
     )
     description = models.TextField(blank=True, null=True, verbose_name="Description")
+    # Nouveaux champs manquants pour cohérence frontend
+    type = models.CharField(
+        max_length=20,
+        default="labor",
+        verbose_name="Type"
+    )
+    unite = models.CharField(
+        max_length=20,
+        default="h",
+        verbose_name="Unité de mesure"
+    )
+    code = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name="Code"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, verbose_name="Créé le")
+    updated_at = models.DateTimeField(auto_now=True, null=True, verbose_name="Mis à jour le")
     
     class Meta:
         verbose_name = "Main d'œuvre"
@@ -99,6 +155,16 @@ class MainOeuvre(models.Model):
     
     def __str__(self):
         return f"{self.nom} ({self.cout_horaire}€/h)"
+    
+    @property
+    def unitPrice(self):
+        """Alias pour cout_horaire (compatibilité frontend)"""
+        return self.cout_horaire
+    
+    @property
+    def prix_achat_ht(self):
+        """Alias pour cout_horaire (compatibilité)"""
+        return self.cout_horaire
 
 class Ouvrage(models.Model):
     """
@@ -120,8 +186,46 @@ class Ouvrage(models.Model):
         max_length=50, 
         blank=True, 
         null=True, 
-        verbose_name="Code"
+        verbose_name="Code/Référence"
     )
+    
+    prix_recommande = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Prix recommandé"
+    )
+    marge = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=20.0,
+        verbose_name="Marge (%)"
+    )
+    is_custom = models.BooleanField(
+        default=False,
+        verbose_name="Ouvrage personnalisé"
+    )
+    # Champs additionnels pour cohérence frontend
+    type = models.CharField(
+        max_length=20,
+        default="work",
+        verbose_name="Type"
+    )
+    complexity = models.CharField(
+        max_length=20,
+        choices=[('low', 'Faible'), ('medium', 'Moyenne'), ('high', 'Élevée')],
+        default='medium',
+        verbose_name="Complexité"
+    )
+    efficiency = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=1.0,
+        verbose_name="Rendement"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True, null=True, verbose_name="Créé le")
+    updated_at = models.DateTimeField(auto_now=True, null=True, verbose_name="Mis à jour le")
     
     class Meta:
         verbose_name = "Ouvrage"
@@ -135,16 +239,48 @@ class Ouvrage(models.Model):
     def debourse_sec(self):
         """
         Calcule le déboursé sec (coût total) de l'ouvrage en fonction des ingrédients et quantités.
-        Formule : Σ (quantité × prix élément)
         """
         total = 0
         for ingredient in self.ingredients.all():
+            total += ingredient.cout_total
+        return total
+    
+    @property
+    def totalCost(self):
+        """Alias pour debourse_sec (compatibilité frontend)"""
+        return self.debourse_sec
+    
+    @property
+    def recommendedPrice(self):
+        """Prix recommandé calculé ou défini manuellement"""
+        if self.prix_recommande > 0:
+            return self.prix_recommande
+        cout_total = self.debourse_sec
+        if cout_total > 0:
+            return cout_total * (1 + float(self.marge) / 100)
+        return 0
+    
+    @property
+    def margin(self):
+        """Alias pour marge (compatibilité frontend)"""
+        return float(self.marge)
+    
+    @property
+    def laborCost(self):
+        """Calcule le coût total de la main d'œuvre"""
+        total = 0
+        for ingredient in self.ingredients.all():
+            if ingredient.element_type.model == 'mainoeuvre':
+                total += ingredient.cout_total
+        return total
+    
+    @property
+    def materialCost(self):
+        """Calcule le coût total des matériaux"""
+        total = 0
+        for ingredient in self.ingredients.all():
             if ingredient.element_type.model == 'fourniture':
-                fourniture = Fourniture.objects.get(id=ingredient.element_id)
-                total += ingredient.quantite * fourniture.prix_achat_ht
-            elif ingredient.element_type.model == 'mainoeuvre':
-                main_oeuvre = MainOeuvre.objects.get(id=ingredient.element_id)
-                total += ingredient.quantite * main_oeuvre.cout_horaire
+                total += ingredient.cout_total
         return total
 
 class IngredientOuvrage(models.Model):

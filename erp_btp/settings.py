@@ -27,7 +27,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -47,8 +47,9 @@ INSTALLED_APPS = [
     "django_filters",  # Ajout pour le filtrage des données
     "authentification",
     "bibliotheque",  # Ajout de l'application bibliotheque
-    "devis",  # Ajout de l'application devis
-    "tiers",  # Ajout de l'application tiers
+    "tiers",
+    "opportunite",  # Ajout de l'application opportunite
+    "devis",        # Ajout de l'application devis
 ]
 
 # Configuration REST Framework

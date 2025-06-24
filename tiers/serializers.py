@@ -152,23 +152,25 @@ class TiersCreateUpdateSerializer(serializers.ModelSerializer):
     
     def update(self, instance, validated_data):
         """Mettre à jour un tier avec ses adresses et contacts"""
-        adresses_data = validated_data.pop('adresses', [])
-        contacts_data = validated_data.pop('contacts', [])
+        adresses_data = validated_data.pop('adresses', None)
+        contacts_data = validated_data.pop('contacts', None)
         
         # Mettre à jour le tier
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         
-        # Gérer les adresses (remplacer complètement)
-        instance.adresses.all().delete()
-        for adresse_data in adresses_data:
-            Adresse.objects.create(tier=instance, **adresse_data)
+        # Gérer les adresses (remplacer complètement) seulement si des adresses sont fournies
+        if adresses_data is not None:
+            instance.adresses.all().delete()
+            for adresse_data in adresses_data:
+                Adresse.objects.create(tier=instance, **adresse_data)
         
-        # Gérer les contacts (remplacer complètement)
-        instance.contacts.all().delete()
-        for contact_data in contacts_data:
-            Contact.objects.create(tier=instance, **contact_data)
+        # Gérer les contacts (remplacer complètement) seulement si des contacts sont fournis
+        if contacts_data is not None:
+            instance.contacts.all().delete()
+            for contact_data in contacts_data:
+                Contact.objects.create(tier=instance, **contact_data)
         
         # Créer une activité de modification
         ActiviteTiers.objects.create(
