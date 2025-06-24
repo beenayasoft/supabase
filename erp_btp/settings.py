@@ -45,6 +45,10 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
     "authentification",
+    "facturation",
+    "tiers",
+    "bibliotheque",
+    "devis",
 ]
 
 # Configuration REST Framework
