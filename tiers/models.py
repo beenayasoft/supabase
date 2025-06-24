@@ -1,9 +1,5 @@
 import uuid
 from django.db import models
-<<<<<<< HEAD
-class Tiers(models.Model):
-       pass
-=======
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
@@ -298,4 +294,4 @@ class ActiviteTiers(models.Model):
     
     def __str__(self):
         return f"{self.tier.nom} - {self.get_type_display()} - {self.date.strftime('%d/%m/%Y %H:%M')}"
->>>>>>> main
+
