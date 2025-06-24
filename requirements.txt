@@ -4,6 +4,9 @@ djangorestframework-simplejwt
 django-cors-headers
 django-filter
 drf-spectacular
+drf-nested-routers
 python-decouple
 python-dotenv
 psycopg2-binary
+reportlab
+
