@@ -197,7 +197,7 @@ class ActiviteTiersCreateSerializer(serializers.ModelSerializer):
 
 
 class TiersFrontendSerializer(serializers.ModelSerializer):
-    """Serializer adapté pour le frontend React"""
+    """Serializer adapté pour le frontend React - VERSION LENTE (garde pour compatibilité)"""
     id = serializers.CharField(read_only=True)
     name = serializers.CharField(source='nom')
     type = serializers.SerializerMethodField()
@@ -243,6 +243,105 @@ class TiersFrontendSerializer(serializers.ModelSerializer):
     def get_address(self, obj):
         """Récupère l'adresse principale formatée"""
         adresse = obj.adresses.filter(facturation=True).first() or obj.adresses.first()
+        if adresse:
+            return f"{adresse.rue}, {adresse.code_postal} {adresse.ville}"
+        return ""
+    
+    def get_status(self, obj):
+        """Renvoie le statut sous forme de chaîne"""
+        return "inactive" if obj.is_deleted else "active"
+
+
+class TiersFrontendOptimizedSerializer(serializers.ModelSerializer):
+    """Serializer OPTIMISÉ pour le frontend avec prefetch - RÉSOUT LE PROBLÈME N+1"""
+    id = serializers.CharField(read_only=True)
+    name = serializers.CharField(source='nom')
+    type = serializers.SerializerMethodField()
+    contact = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
+    siret = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Tiers
+        fields = [
+            'id', 'name', 'type', 'contact', 'email', 'phone', 
+            'address', 'siret', 'status'
+        ]
+    
+    def get_type(self, obj):
+        """Renvoie la relation principale comme type (nouveau système)"""
+        if hasattr(obj, 'relation') and obj.relation:
+            return [obj.relation]
+        return obj.flags if obj.flags else ['prospect']
+    
+    def get_contact(self, obj):
+        """Récupère le nom complet du contact principal - OPTIMISÉ avec prefetch"""
+        # Utilise les données préchargées via prefetch_related
+        contacts = getattr(obj, '_prefetched_contacts', obj.contacts.all())
+        contact_principal = None
+        contact_fallback = None
+        
+        for contact in contacts:
+            if contact.contact_principal_devis:
+                contact_principal = contact
+                break
+            if not contact_fallback:
+                contact_fallback = contact
+        
+        contact = contact_principal or contact_fallback
+        if contact:
+            return f"{contact.prenom} {contact.nom}"
+        return ""
+    
+    def get_email(self, obj):
+        """Récupère l'email du contact principal - OPTIMISÉ avec prefetch"""
+        contacts = getattr(obj, '_prefetched_contacts', obj.contacts.all())
+        contact_principal = None
+        contact_fallback = None
+        
+        for contact in contacts:
+            if contact.contact_principal_devis:
+                contact_principal = contact
+                break
+            if not contact_fallback:
+                contact_fallback = contact
+        
+        contact = contact_principal or contact_fallback
+        return contact.email if contact else ""
+    
+    def get_phone(self, obj):
+        """Récupère le téléphone du contact principal - OPTIMISÉ avec prefetch"""
+        contacts = getattr(obj, '_prefetched_contacts', obj.contacts.all())
+        contact_principal = None
+        contact_fallback = None
+        
+        for contact in contacts:
+            if contact.contact_principal_devis:
+                contact_principal = contact
+                break
+            if not contact_fallback:
+                contact_fallback = contact
+        
+        contact = contact_principal or contact_fallback
+        return contact.telephone if contact else ""
+    
+    def get_address(self, obj):
+        """Récupère l'adresse principale formatée - OPTIMISÉ avec prefetch"""
+        adresses = getattr(obj, '_prefetched_adresses', obj.adresses.all())
+        adresse_facturation = None
+        adresse_fallback = None
+        
+        for adresse in adresses:
+            if adresse.facturation:
+                adresse_facturation = adresse
+                break
+            if not adresse_fallback:
+                adresse_fallback = adresse
+        
+        adresse = adresse_facturation or adresse_fallback
         if adresse:
             return f"{adresse.rue}, {adresse.code_postal} {adresse.ville}"
         return ""

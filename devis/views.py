@@ -6,6 +6,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from decimal import Decimal
 from django.db import transaction
@@ -18,6 +19,30 @@ from .serializers import (
     QuoteDuplicateSerializer, QuoteExportSerializer
 )
 from tiers.models import Tiers
+
+
+class QuotesPagination(PageNumberPagination):
+    """Pagination optimisée pour les devis"""
+    page_size = 10  # 10 devis par page par défaut
+    page_size_query_param = 'page_size'
+    max_page_size = 50  # Maximum 50 devis par page
+    page_query_param = 'page'
+    
+    def get_paginated_response(self, data):
+        """Réponse paginée enrichie pour le frontend"""
+        return Response({
+            'results': data,
+            'pagination': {
+                'count': self.page.paginator.count,
+                'num_pages': self.page.paginator.num_pages,
+                'current_page': self.page.number,
+                'page_size': self.get_page_size(self.request),
+                'has_next': self.page.has_next(),
+                'has_previous': self.page.has_previous(),
+                'next_page': self.page.next_page_number() if self.page.has_next() else None,
+                'previous_page': self.page.previous_page_number() if self.page.has_previous() else None,
+            }
+        })
 
 
 class QuoteViewSet(viewsets.ModelViewSet):
@@ -50,6 +75,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
     search_fields = ['number', 'client_name', 'project_name', 'notes']
     ordering_fields = ['created_at', 'issue_date', 'expiry_date', 'total_ttc', 'number']
     ordering = ['-created_at']
+    pagination_class = QuotesPagination  # 📊 OPTIMISATION: Pagination côté backend
     
     def get_serializer_class(self):
         """
@@ -68,8 +94,11 @@ class QuoteViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Personnaliser le queryset avec des optimisations et filtres avancés.
+        🚀 OPTIMISÉ : Préchargement des relations pour éviter N+1
         """
-        queryset = Quote.objects.select_related('tier').prefetch_related('items')
+        queryset = Quote.objects.select_related('tier').prefetch_related(
+            'items',  # Précharger les éléments du devis
+        )
         
         # Filtres personnalisés
         client_id = self.request.query_params.get('client_id')
@@ -139,47 +168,78 @@ class QuoteViewSet(viewsets.ModelViewSet):
         
         serializer.save(updated_by=updated_by)
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[])
     def stats(self, request):
         """
-        Endpoint pour récupérer les statistiques globales des devis.
+        Endpoint dédié pour les statistiques globales des devis - OPTIMISÉ
+        🚀 Calcule sur TOUS les devis (pas seulement la page courante)
         """
         try:
-            # Compter les devis par statut
-            quotes = Quote.objects.all()
+            # Récupérer TOUS les devis (sans pagination) pour calculer les vraies stats
+            all_queryset = self.get_queryset()
             
-            stats_data = {
-                'total': quotes.count(),
-                'draft': quotes.filter(status=QuoteStatus.DRAFT).count(),
-                'sent': quotes.filter(status=QuoteStatus.SENT).count(),
-                'accepted': quotes.filter(status=QuoteStatus.ACCEPTED).count(),
-                'rejected': quotes.filter(status=QuoteStatus.REJECTED).count(),
-                'expired': quotes.filter(status=QuoteStatus.EXPIRED).count(),
-                'cancelled': quotes.filter(status=QuoteStatus.CANCELLED).count(),
-            }
+            # Appliquer seulement le filtre de recherche si présent (pas la pagination)
+            search = request.query_params.get('search', '')
+            if search:
+                all_queryset = all_queryset.filter(
+                    Q(number__icontains=search) |
+                    Q(client_name__icontains=search) |
+                    Q(project_name__icontains=search) |
+                    Q(notes__icontains=search)
+                ).distinct()
             
-            # Calculer le montant total
-            total_amount = quotes.aggregate(
+            total_count = all_queryset.count()
+            
+            # Compter par statut de manière optimisée
+            draft_count = all_queryset.filter(status='draft').count()
+            sent_count = all_queryset.filter(status='sent').count()
+            accepted_count = all_queryset.filter(status='accepted').count()
+            rejected_count = all_queryset.filter(status='rejected').count()
+            expired_count = all_queryset.filter(status='expired').count()
+            cancelled_count = all_queryset.filter(status='cancelled').count()
+            
+            # Calculer le montant total de manière optimisée
+            total_amount_aggregate = all_queryset.aggregate(
                 total=Sum('total_ttc')
-            )['total'] or Decimal('0')
-            stats_data['total_amount'] = total_amount
+            )['total'] or 0
+            total_amount = float(total_amount_aggregate)
             
             # Calculer le taux d'acceptation
-            sent_count = stats_data['sent'] + stats_data['accepted'] + stats_data['rejected']
-            if sent_count > 0:
-                acceptance_rate = (stats_data['accepted'] / sent_count) * 100
-            else:
-                acceptance_rate = 0
-            stats_data['acceptance_rate'] = Decimal(str(round(acceptance_rate, 2)))
+            total_decisions = sent_count + accepted_count + rejected_count
+            acceptance_rate = 0
+            if total_decisions > 0:
+                acceptance_rate = round((accepted_count / total_decisions) * 100, 2)
             
-            serializer = QuoteStatsSerializer(stats_data)
-            return Response(serializer.data)
+            # Données de réponse
+            stats_data = {
+                'total': total_count,
+                'draft': draft_count,
+                'sent': sent_count,
+                'accepted': accepted_count,
+                'rejected': rejected_count,
+                'expired': expired_count,
+                'cancelled': cancelled_count,
+                'total_amount': total_amount,
+                'acceptance_rate': acceptance_rate
+            }
+            
+            return Response(stats_data)
         
         except Exception as e:
-            return Response(
-                {"detail": f"Erreur lors du calcul des statistiques: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            # Réponse de fallback en cas d'erreur
+            fallback_stats = {
+                'total': 0,
+                'draft': 0,
+                'sent': 0,
+                'accepted': 0,
+                'rejected': 0,
+                'expired': 0,
+                'cancelled': 0,
+                'total_amount': 0,
+                'acceptance_rate': 0,
+                'error': f"Erreur : {str(e)}"
+            }
+            return Response(fallback_stats)
     
     @action(detail=True, methods=['post'])
     def mark_as_sent(self, request, pk=None):
@@ -320,13 +380,13 @@ class QuoteViewSet(viewsets.ModelViewSet):
                 project_name=original_quote.project_name,
                 issue_date=timezone.now().date(),
                 expiry_date=timezone.now().date() + timedelta(days=30),
-                conditions=original_quote.conditions,
+                terms_and_conditions=original_quote.terms_and_conditions,
                 notes=original_quote.notes,
                 tier=original_quote.tier,
                 status=QuoteStatus.DRAFT,
                 # Les totaux seront recalculés automatiquement
                 total_ht=Decimal('0'),
-                total_tva=Decimal('0'),
+                total_vat=Decimal('0'),
                 total_ttc=Decimal('0'),
                 created_by=self.request.user.email if hasattr(self.request.user, 'email') else None
             )
@@ -342,8 +402,8 @@ class QuoteViewSet(viewsets.ModelViewSet):
                         quantity=item.quantity,
                         unit=item.unit,
                         unit_price=item.unit_price,
-                        discount_percentage=item.discount_percentage,
-                        tva_rate=item.tva_rate,
+                        discount=item.discount,
+                        vat_rate=item.vat_rate,
                         position=item.position,
                         type=item.type,
                         parent=item.parent,
@@ -351,8 +411,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
                     )
                 
                 # Recalculer les totaux
-                new_quote.calculate_totals()
-                new_quote.save()
+                new_quote.update_totals()
             
             serializer = QuoteDetailSerializer(new_quote)
             return Response({
@@ -407,9 +466,27 @@ class QuoteViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 # Mettre à jour les informations du devis
                 quote_data = request.data.get('quote', {})
-                for field, value in quote_data.items():
-                    if hasattr(quote, field) and field not in ['id', 'created_at', 'updated_at']:
-                        setattr(quote, field, value)
+                
+                # ✅ CONVERSION FRONTEND → BACKEND - Mapper les champs correctement
+                field_mapping = {
+                    'tier': 'tier_id',  # UUID string → tier_id pour Django ORM
+                    'conditions': 'terms_and_conditions',  # Frontend 'conditions' → Backend 'terms_and_conditions'
+                    'issueDate': 'issue_date',  # CamelCase → snake_case
+                    'expiryDate': 'expiry_date',  # CamelCase → snake_case
+                }
+                
+                # Appliquer les mappings et mettre à jour le devis
+                for frontend_field, value in quote_data.items():
+                    backend_field = field_mapping.get(frontend_field, frontend_field)
+                    if hasattr(quote, backend_field) and backend_field not in ['id', 'created_at', 'updated_at']:
+                        # ✅ VALIDATION TIER - Vérifier que le client existe si on met à jour le tier
+                        if backend_field == 'tier_id' and value:
+                            if not Tiers.objects.filter(id=value).exists():
+                                return Response(
+                                    {"detail": f"Le client avec l'ID {value} n'existe pas."}, 
+                                    status=status.HTTP_400_BAD_REQUEST
+                                )
+                        setattr(quote, backend_field, value)
                 
                 # Gérer les éléments
                 items_data = request.data.get('items', [])
@@ -426,8 +503,8 @@ class QuoteViewSet(viewsets.ModelViewSet):
                             'quantity': 'quantity',
                             'unit': 'unit',
                             'unitPrice': 'unit_price',
-                            'discountPercentage': 'discount_percentage',
-                            'tvaRate': 'tva_rate',
+                            'discount': 'discount',
+                            'vat_rate': 'vat_rate',
                             'type': 'type',
                             'reference': 'reference'
                         }
@@ -435,7 +512,31 @@ class QuoteViewSet(viewsets.ModelViewSet):
                         backend_data = {}
                         for frontend_field, backend_field in field_mapping.items():
                             if frontend_field in item_data:
-                                backend_data[backend_field] = item_data[frontend_field]
+                                value = item_data[frontend_field]
+                                
+                                # ✅ CONVERSION EN DECIMAL pour éviter les conflits de types
+                                if backend_field in ['quantity', 'unit_price', 'discount', 'margin']:
+                                    try:
+                                        from decimal import Decimal
+                                        # Convertir en Decimal pour compatibilité avec Django DecimalField
+                                        backend_data[backend_field] = Decimal(str(value))
+                                        print(f"🔄 UPDATE - Converted {backend_field}: {value} ({type(value).__name__}) → {backend_data[backend_field]} (Decimal)")
+                                    except (ValueError, TypeError) as e:
+                                        print(f"⚠️ Erreur conversion Decimal {backend_field}: {value} -> {e}")
+                                        backend_data[backend_field] = value  # Fallback à la valeur originale
+                                else:
+                                    # ✅ AUTRES CHAMPS - pas de conversion
+                                    backend_data[backend_field] = value
+                        
+                        # ✅ GÉRER margin s'il existe dans item_data mais pas dans field_mapping
+                        if 'margin' in item_data:
+                            try:
+                                from decimal import Decimal
+                                backend_data['margin'] = Decimal(str(item_data['margin']))
+                                print(f"🔄 UPDATE - Converted margin: {item_data['margin']} → {backend_data['margin']} (Decimal)")
+                            except (ValueError, TypeError) as e:
+                                print(f"⚠️ Erreur conversion Decimal margin: {item_data['margin']} -> {e}")
+                                backend_data['margin'] = item_data['margin']
                         
                         backend_data['quote'] = quote
                         backend_data['position'] = position + 1
@@ -443,8 +544,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
                         QuoteItem.objects.create(**backend_data)
                 
                 # Recalculer les totaux
-                quote.calculate_totals()
-                quote.save()
+                quote.update_totals()
                 
                 # Retourner le devis mis à jour
                 serializer = QuoteDetailSerializer(quote)
@@ -469,13 +569,56 @@ class QuoteViewSet(viewsets.ModelViewSet):
                 # Créer le devis
                 quote_data = request.data.get('quote', {})
                 
-                # Définir des valeurs par défaut
-                quote_data.setdefault('issue_date', timezone.now().date())
-                quote_data.setdefault('expiry_date', timezone.now().date() + timedelta(days=30))
-                quote_data.setdefault('status', QuoteStatus.DRAFT)
-                quote_data.setdefault('created_by', getattr(self.request.user, 'email', None))
+                # ✅ CONVERSION FRONTEND → BACKEND - Mapper les champs correctement
+                field_mapping = {
+                    'tier': 'tier_id',  # UUID string → tier_id pour Django ORM
+                    'conditions': 'terms_and_conditions',  # Frontend 'conditions' → Backend 'terms_and_conditions'
+                    'issueDate': 'issue_date',  # CamelCase → snake_case
+                    # SUPPRIMER : 'expiryDate': 'expiry_date',  # ❌ NE PAS MAPPER - calculé automatiquement
+                }
                 
-                quote = Quote.objects.create(**quote_data)
+                # Appliquer les mappings de champs avec gestion spéciale des dates
+                backend_quote_data = {}
+                for frontend_field, value in quote_data.items():
+                    backend_field = field_mapping.get(frontend_field, frontend_field)
+                    
+                    # ✅ IGNORER COMPLÈTEMENT expiryDate - sera calculé automatiquement par le modèle
+                    if frontend_field == 'expiryDate':
+                        print(f"🚫 Ignoring expiryDate from frontend: {value} (will be calculated automatically)")
+                        continue
+                    
+                    # ✅ GESTION SPÉCIALE DE issue_date
+                    if backend_field == 'issue_date':
+                        if value and value.strip():
+                            try:
+                                from datetime import datetime
+                                parsed_date = datetime.strptime(value, '%Y-%m-%d').date()
+                                backend_quote_data[backend_field] = parsed_date
+                                print(f"✅ Parsed issue_date: {value} -> {parsed_date}")
+                            except (ValueError, TypeError) as e:
+                                print(f"⚠️ Erreur parsing date {backend_field}: {value} -> {e}")
+                                # Utiliser la date par défaut
+                        continue
+                    
+                    # ✅ GESTION STANDARD DES AUTRES CHAMPS
+                    backend_quote_data[backend_field] = value
+                
+                # Définir des valeurs par défaut
+                backend_quote_data.setdefault('issue_date', timezone.now().date())
+                # SUPPRIMER : backend_quote_data.setdefault('expiry_date', timezone.now().date() + timedelta(days=30))
+                backend_quote_data.setdefault('status', QuoteStatus.DRAFT)
+                backend_quote_data.setdefault('created_by', getattr(self.request.user, 'email', None))
+                
+                # ✅ VALIDATION TIER - Vérifier que le client existe
+                if 'tier_id' in backend_quote_data:
+                    tier_id = backend_quote_data['tier_id']
+                    if not Tiers.objects.filter(id=tier_id).exists():
+                        return Response(
+                            {"detail": f"Le client avec l'ID {tier_id} n'existe pas."}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                
+                quote = Quote.objects.create(**backend_quote_data)
                 
                 # Créer les éléments
                 items_data = request.data.get('items', [])
@@ -487,8 +630,8 @@ class QuoteViewSet(viewsets.ModelViewSet):
                         'quantity': 'quantity',
                         'unit': 'unit',
                         'unitPrice': 'unit_price',
-                        'discountPercentage': 'discount_percentage',
-                        'tvaRate': 'tva_rate',
+                        'discount': 'discount',
+                        'vat_rate': 'vat_rate',
                         'type': 'type',
                         'reference': 'reference'
                     }
@@ -496,7 +639,31 @@ class QuoteViewSet(viewsets.ModelViewSet):
                     backend_data = {}
                     for frontend_field, backend_field in field_mapping.items():
                         if frontend_field in item_data:
-                            backend_data[backend_field] = item_data[frontend_field]
+                            value = item_data[frontend_field]
+                            
+                            # ✅ CONVERSION EN DECIMAL pour éviter les conflits de types
+                            if backend_field in ['quantity', 'unit_price', 'discount', 'margin']:
+                                try:
+                                    from decimal import Decimal
+                                    # Convertir en Decimal pour compatibilité avec Django DecimalField
+                                    backend_data[backend_field] = Decimal(str(value))
+                                    print(f"🔢 Converted {backend_field}: {value} ({type(value).__name__}) → {backend_data[backend_field]} (Decimal)")
+                                except (ValueError, TypeError) as e:
+                                    print(f"⚠️ Erreur conversion Decimal {backend_field}: {value} -> {e}")
+                                    backend_data[backend_field] = value  # Fallback à la valeur originale
+                            else:
+                                # ✅ AUTRES CHAMPS - pas de conversion
+                                backend_data[backend_field] = value
+                    
+                    # ✅ GÉRER margin s'il existe dans item_data mais pas dans field_mapping
+                    if 'margin' in item_data:
+                        try:
+                            from decimal import Decimal
+                            backend_data['margin'] = Decimal(str(item_data['margin']))
+                            print(f"🔢 Converted margin: {item_data['margin']} → {backend_data['margin']} (Decimal)")
+                        except (ValueError, TypeError) as e:
+                            print(f"⚠️ Erreur conversion Decimal margin: {item_data['margin']} -> {e}")
+                            backend_data['margin'] = item_data['margin']
                     
                     backend_data['quote'] = quote
                     backend_data['position'] = position + 1
@@ -504,8 +671,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
                     QuoteItem.objects.create(**backend_data)
                 
                 # Recalculer les totaux
-                quote.calculate_totals()
-                quote.save()
+                quote.update_totals()
                 
                 # Retourner le devis créé
                 serializer = QuoteDetailSerializer(quote)
@@ -665,8 +831,8 @@ class QuoteItemViewSet(viewsets.ModelViewSet):
                             'quantity': 'quantity',
                             'unit': 'unit',
                             'unitPrice': 'unit_price',
-                            'discountPercentage': 'discount_percentage',
-                            'tvaRate': 'tva_rate',
+                            'discount': 'discount',
+                            'vat_rate': 'vat_rate',
                             'type': 'type',
                             'reference': 'reference'
                         }
@@ -692,8 +858,8 @@ class QuoteItemViewSet(viewsets.ModelViewSet):
                             'quantity': 'quantity',
                             'unit': 'unit',
                             'unitPrice': 'unit_price',
-                            'discountPercentage': 'discount_percentage',
-                            'tvaRate': 'tva_rate',
+                            'discount': 'discount',
+                            'vat_rate': 'vat_rate',
                             'type': 'type',
                             'reference': 'reference'
                         }

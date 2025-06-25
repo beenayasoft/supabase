@@ -91,12 +91,34 @@ class QuoteItem(models.Model):
     def save(self, *args, **kwargs):
         # Calculer le total HT et TTC
         if self.type not in ["chapter", "section"]:
-            from decimal import Decimal
-            net_price = self.unit_price * (1 - self.discount / 100)
-            self.total_ht = net_price * self.quantity
-            vat_rate_decimal = Decimal(str(self.vat_rate)) / 100
-            vat_amount = self.total_ht * vat_rate_decimal
-            self.total_ttc = self.total_ht + vat_amount
+            from decimal import Decimal, InvalidOperation
+            
+            # ✅ CONVERSION SÉCURISÉE DES TYPES POUR ÉVITER LES CONFLITS
+            # Assurer que tous les champs numériques sont des Decimal
+            try:
+                unit_price = Decimal(str(self.unit_price)) if self.unit_price else Decimal('0')
+                quantity = Decimal(str(self.quantity)) if self.quantity else Decimal('1')
+                discount = Decimal(str(self.discount)) if self.discount else Decimal('0')
+                vat_rate_value = Decimal(str(self.vat_rate)) if self.vat_rate else Decimal('20')
+                
+                # ✅ CALCULS AVEC TYPES DECIMAL UNIFORMES
+                discount_factor = Decimal('1') - (discount / Decimal('100'))
+                net_price = unit_price * discount_factor
+                self.total_ht = net_price * quantity
+                
+                vat_rate_decimal = vat_rate_value / Decimal('100')
+                vat_amount = self.total_ht * vat_rate_decimal
+                self.total_ttc = self.total_ht + vat_amount
+                
+                print(f"💰 Calcul QuoteItem: {self.designation}")
+                print(f"   unit_price={unit_price}, quantity={quantity}, discount={discount}%")
+                print(f"   net_price={net_price}, total_ht={self.total_ht}, total_ttc={self.total_ttc}")
+                
+            except (ValueError, TypeError, InvalidOperation) as e:
+                print(f"⚠️ Erreur de calcul QuoteItem {self.designation}: {e}")
+                # Fallback avec valeurs par défaut
+                self.total_ht = Decimal('0')
+                self.total_ttc = Decimal('0')
         
         super().save(*args, **kwargs)
         

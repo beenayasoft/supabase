@@ -4,7 +4,7 @@ from .views import QuoteViewSet, QuoteItemViewSet
 
 # Créer un routeur pour les ViewSets
 router = DefaultRouter()
-router.register(r'quotes', QuoteViewSet)
+router.register(r'', QuoteViewSet)
 router.register(r'quote-items', QuoteItemViewSet)
 
 # Configuration des URLs
