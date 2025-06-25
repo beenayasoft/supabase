@@ -27,7 +27,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -44,7 +44,12 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",  # Ajout pour gérer les tokens révoqués
     "corsheaders",
     "drf_spectacular",
+    "django_filters",  # Ajout pour le filtrage des données
     "authentification",
+    "bibliotheque",  # Ajout de l'application bibliotheque
+    "tiers",
+    "opportunite",  # Ajout de l'application opportunite
+    "devis",        # Ajout de l'application devis
 ]
 
 # Configuration REST Framework
@@ -55,6 +60,10 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    # 🚀 PAGINATION: Configuration par défaut
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,  # Nombre d'éléments par page par défaut
 }
 
 # Configuration CORS
@@ -77,6 +86,13 @@ CORS_ALLOW_HEADERS = [
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
+]
+
+# 📊 Headers de performance exposés au frontend
+CORS_EXPOSE_HEADERS = [
+    "X-Performance-Time",
+    "X-Performance-Queries", 
+    "X-Performance-SQL-Time",
 ]
 
 # Méthodes HTTP autorisées
@@ -119,6 +135,7 @@ AUTH_USER_MODEL = "authentification.User"
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "erp_btp.middleware.PerformanceMiddleware",  # 📊 AJOUT: Middleware de performance
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -202,3 +219,28 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# 📊 Configuration des logs de performance
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '📊 {levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'erp_btp.middleware': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
