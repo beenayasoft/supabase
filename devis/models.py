@@ -3,7 +3,7 @@ import uuid
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from tiers.models import Tiers
-# from opportunite.models import Opportunity  # Temporairement commenté pour les migrations
+from opportunite.models import Opportunity
 
 def get_current_date():
     """Retourne la date courante (pas datetime)."""
@@ -143,14 +143,14 @@ class Quote(models.Model):
         related_name="quotes",
         verbose_name=_("Client")
     )
-    # opportunity = models.ForeignKey(
-    #     Opportunity, 
-    #     on_delete=models.SET_NULL, 
-    #     null=True, 
-    #     blank=True,
-    #     related_name="quotes",
-    #     verbose_name=_("Opportunité")
-    # )
+    opportunity = models.ForeignKey(
+        Opportunity, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name="quotes",
+        verbose_name=_("Opportunité")
+    )
     
     # Informations client et projet
     client_name = models.CharField(max_length=255, verbose_name=_("Nom du client"))
@@ -238,9 +238,9 @@ class Quote(models.Model):
         self.save()
         
         # Mettre à jour l'opportunité si elle existe et est en phase d'analyse des besoins
-        # if self.opportunity and self.opportunity.stage == "needs_analysis":
-        #     self.opportunity.stage = "negotiation"
-        #     self.opportunity.save()
+        if self.opportunity and self.opportunity.stage == "needs_analysis":
+            self.opportunity.stage = "negotiation"
+            self.opportunity.save()
     
     def mark_as_accepted(self):
         """Marquer le devis comme accepté et mettre à jour l'opportunité associée"""
@@ -248,9 +248,9 @@ class Quote(models.Model):
         self.save()
         
         # Mettre à jour l'opportunité si elle existe et est en phase de négociation
-        # if self.opportunity and self.opportunity.stage == "negotiation":
-        #     self.opportunity.stage = "won"
-        #     self.opportunity.save()
+        if self.opportunity and self.opportunity.stage == "negotiation":
+            self.opportunity.stage = "won"
+            self.opportunity.save()
     
     def mark_as_rejected(self):
         """Marquer le devis comme refusé"""
