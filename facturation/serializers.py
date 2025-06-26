@@ -134,11 +134,12 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invoice
         fields = [
-            'tier', 'client_name', 'client_address', 'project_name', 
+            'id', 'tier', 'client_name', 'client_address', 'project_name', 
             'project_address', 'project_reference', 'issue_date', 'due_date', 'payment_terms',
             'notes', 'terms_and_conditions', 'quote', 'quote_number',
             'created_by', 'items'
         ]
+        read_only_fields = ['id']
     
     def create(self, validated_data):
         """Créer une facture avec ses éléments"""
@@ -153,6 +154,9 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         
         # Mettre à jour les totaux
         invoice.update_totals()
+        
+        # S'assurer que l'ID est bien présent
+        invoice.refresh_from_db()
         
         return invoice
 
