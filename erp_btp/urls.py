@@ -34,6 +34,9 @@ urlpatterns = [
     # API Devis
     path("api/quotes/", include("devis.urls")),
     
+    # API Facturation
+    path("", include("facturation.urls")),
+    
     # API Opportunités
     path("", include("opportunite.urls")),
     

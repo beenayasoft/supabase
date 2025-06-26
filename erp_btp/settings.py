@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "tiers",
     "opportunite",  # Ajout de l'application opportunite
     "devis",        # Ajout de l'application devis
+    "facturation",  # Ajout de l'application facturation
 ]
 
 # Configuration REST Framework
