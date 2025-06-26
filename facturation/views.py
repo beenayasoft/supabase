@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q, Sum, Count, Avg
 from django.db.models.functions import Coalesce
+from django.http import HttpResponse
 from datetime import datetime, timedelta
 import uuid
 
@@ -16,6 +17,7 @@ from .serializers import (
     ValidateInvoiceSerializer, RecordPaymentSerializer, CreateCreditNoteSerializer,
     InvoiceStatsSerializer, InvoiceFilterSerializer
 )
+from .pdf_generator import InvoicePDFGenerator
 from devis.models import Quote  # Import pour créer depuis devis
 from tiers.models import Tiers
 
@@ -502,6 +504,34 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {'error': f'Erreur lors du calcul de l\'aperçu: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'], url_path='export')
+    def export_invoice(self, request, pk=None):
+        """
+        Exporter une facture au format PDF
+        POST /api/invoices/{id}/export/
+        """
+        invoice = self.get_object()
+        
+        try:
+            # Générer le PDF
+            pdf_generator = InvoicePDFGenerator(invoice)
+            pdf_content = pdf_generator.generate_pdf()
+            
+            # Créer la réponse HTTP avec le contenu PDF
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            
+            # Définir le nom du fichier pour le téléchargement
+            filename = f"Facture_{invoice.number.replace('/', '_')}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur lors de la génération du PDF: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

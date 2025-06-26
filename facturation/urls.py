@@ -1,17 +1,16 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
+from .views import InvoiceViewSet, InvoiceItemViewSet, PaymentViewSet
 
 # Router pour les ViewSets
 router = DefaultRouter()
-router.register(r'invoices', views.InvoiceViewSet, basename='invoice')
-router.register(r'invoice-items', views.InvoiceItemViewSet, basename='invoiceitem')
-router.register(r'payments', views.PaymentViewSet, basename='payment')
+router.register(r'invoices', InvoiceViewSet, basename='invoice')
+router.register(r'invoice-items', InvoiceItemViewSet, basename='invoice-item')
+router.register(r'payments', PaymentViewSet, basename='payment')
 
 # URLs de l'app facturation
 urlpatterns = [
-    # API REST avec ViewSets
-    path('api/', include(router.urls)),
+    path('', include(router.urls)),
 ]
 
 # Structure des URLs générées par le router :
@@ -30,6 +29,10 @@ urlpatterns = [
 # POST   /api/invoices/{id}/record-payment/ - US 5.4: Enregistrer règlement
 # POST   /api/invoices/{id}/create-credit-note/ - US 5.5: Créer avoir
 # GET    /api/invoices/stats/               - Statistiques de facturation
+# GET    /api/invoices/{id}/deletion-constraints/ - Contraintes de suppression
+# GET    /api/invoices/{id}/payment-impact/ - Impact d'un paiement
+# POST   /api/invoices/{id}/credit-note-preview/ - Aperçu d'un avoir
+# POST   /api/invoices/{id}/export/ - Exporter une facture en PDF
 #
 # ÉLÉMENTS DE FACTURE (InvoiceItemViewSet):
 # GET    /api/invoice-items/                - Liste des éléments
