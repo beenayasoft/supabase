@@ -128,6 +128,9 @@ class QuoteSerializer(serializers.ModelSerializer):
     issue_date_formatted = serializers.SerializerMethodField()
     expiry_date_formatted = serializers.SerializerMethodField()
     
+    # Informations sur l'opportunité associée
+    opportunity_details = serializers.SerializerMethodField()
+    
     class Meta:
         model = Quote
         fields = [
@@ -135,7 +138,8 @@ class QuoteSerializer(serializers.ModelSerializer):
             'client_name', 'client_type', 'client_address',
             'project_name', 'project_address', 'issue_date', 'expiry_date',
             'issue_date_formatted', 'expiry_date_formatted', 'validity_period',
-            'notes', 'terms_and_conditions', 'total_ht', 'total_vat', 'total_ttc',
+            'notes', 'terms_and_conditions', 'opportunity', 'opportunity_details',
+            'total_ht', 'total_vat', 'total_ttc',
             'items_count', 'created_at', 'updated_at', 'created_by', 'updated_by'
         ]
         read_only_fields = [
@@ -157,6 +161,19 @@ class QuoteSerializer(serializers.ModelSerializer):
         """Formater la date d'expiration."""
         if obj.expiry_date:
             return obj.expiry_date.strftime('%d/%m/%Y')
+        return None
+    
+    def get_opportunity_details(self, obj):
+        """Récupérer les informations de l'opportunité associée."""
+        if obj.opportunity:
+            return {
+                'id': str(obj.opportunity.id),
+                'name': obj.opportunity.name,
+                'stage': obj.opportunity.stage,
+                'stage_display': obj.opportunity.get_stage_display(),
+                'probability': obj.opportunity.probability,
+                'amount': obj.opportunity.estimated_amount
+            }
         return None
     
     def validate_tier(self, value):

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from decimal import Decimal
 from .models import Invoice, InvoiceItem, Payment, InvoiceStatus, VATRate, PaymentMethod
+from datetime import datetime
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -120,8 +121,16 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
     def validate_due_date(self, value):
         """Valider la date d'échéance"""
         issue_date = self.initial_data.get('issue_date')
-        if issue_date and value < issue_date:
-            raise serializers.ValidationError("La date d'échéance ne peut pas être antérieure à la date d'émission")
+        if issue_date:
+            # Convertir issue_date en objet date si c'est une chaîne
+            if isinstance(issue_date, str):
+                try:
+                    issue_date = datetime.strptime(issue_date, "%Y-%m-%d").date()
+                except ValueError:
+                    raise serializers.ValidationError("Format de date d'émission invalide")
+            
+            if value < issue_date:
+                raise serializers.ValidationError("La date d'échéance ne peut pas être antérieure à la date d'émission")
         return value
 
 

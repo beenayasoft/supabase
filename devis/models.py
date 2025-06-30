@@ -237,25 +237,64 @@ class Quote(models.Model):
         self.status = QuoteStatus.SENT
         self.save()
         
-        # Mettre à jour l'opportunité si elle existe et est en phase d'analyse des besoins
-        if self.opportunity and self.opportunity.stage == "needs_analysis":
-            self.opportunity.stage = "negotiation"
-            self.opportunity.save()
+        # Mettre à jour l'opportunité si elle existe
+        if self.opportunity:
+            from opportunite.models import OpportunityStatus
+            
+            # Si l'opportunité est en phase d'analyse des besoins ou nouvelle, la passer en négociation
+            if self.opportunity.stage in [OpportunityStatus.NEEDS_ANALYSIS, OpportunityStatus.NEW]:
+                self.opportunity.stage = OpportunityStatus.NEGOTIATION
+                self.opportunity.save()
+                print(f"✅ Opportunité {self.opportunity.id} mise à jour: {self.opportunity.stage}")
+            else:
+                print(f"ℹ️ Opportunité {self.opportunity.id} non mise à jour car déjà en phase {self.opportunity.stage}")
     
     def mark_as_accepted(self):
         """Marquer le devis comme accepté et mettre à jour l'opportunité associée"""
         self.status = QuoteStatus.ACCEPTED
         self.save()
         
-        # Mettre à jour l'opportunité si elle existe et est en phase de négociation
-        if self.opportunity and self.opportunity.stage == "negotiation":
-            self.opportunity.stage = "won"
-            self.opportunity.save()
+        # Mettre à jour l'opportunité si elle existe
+        if self.opportunity:
+            from opportunite.models import OpportunityStatus
+            
+            # Si l'opportunité est en phase de négociation ou d'analyse, la marquer comme gagnée
+            if self.opportunity.stage in [OpportunityStatus.NEGOTIATION, OpportunityStatus.NEEDS_ANALYSIS]:
+                self.opportunity.stage = OpportunityStatus.WON
+                self.opportunity.save()
+                print(f"🎉 Opportunité {self.opportunity.id} marquée comme gagnée")
+            elif self.opportunity.stage != OpportunityStatus.WON:
+                print(f"⚠️ Opportunité {self.opportunity.id} non mise à jour car en phase {self.opportunity.stage}")
     
     def mark_as_rejected(self):
-        """Marquer le devis comme refusé"""
+        """Marquer le devis comme refusé et mettre à jour l'opportunité associée si nécessaire"""
         self.status = QuoteStatus.REJECTED
         self.save()
+        
+        # Mettre à jour l'opportunité si elle existe et n'est pas déjà perdue ou gagnée
+        if self.opportunity:
+            from opportunite.models import OpportunityStatus
+            
+            # Si l'opportunité est en phase de négociation ou d'analyse, on peut la marquer comme perdue
+            # seulement si c'est le seul devis associé à cette opportunité
+            if self.opportunity.stage in [OpportunityStatus.NEGOTIATION, OpportunityStatus.NEEDS_ANALYSIS]:
+                # Vérifier s'il y a d'autres devis actifs pour cette opportunité
+                other_active_quotes = Quote.objects.filter(
+                    opportunity=self.opportunity,
+                    status__in=[QuoteStatus.DRAFT, QuoteStatus.SENT]
+                ).exclude(id=self.id).exists()
+                
+                if not other_active_quotes:
+                    # Si c'est le seul devis, on peut marquer l'opportunité comme perdue
+                    self.opportunity.stage = OpportunityStatus.LOST
+                    self.opportunity.loss_reason = "no_decision"  # Raison par défaut
+                    self.opportunity.loss_description = "Devis refusé par le client"
+                    self.opportunity.save()
+                    print(f"❌ Opportunité {self.opportunity.id} marquée comme perdue suite au refus du devis")
+                else:
+                    print(f"ℹ️ Opportunité {self.opportunity.id} non mise à jour car d'autres devis sont en cours")
+            else:
+                print(f"ℹ️ Opportunité {self.opportunity.id} non mise à jour car déjà en phase {self.opportunity.stage}")
     
     def mark_as_expired(self):
         """Marquer le devis comme expiré"""

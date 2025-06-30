@@ -486,7 +486,24 @@ class QuoteViewSet(viewsets.ModelViewSet):
                                     {"detail": f"Le client avec l'ID {value} n'existe pas."}, 
                                     status=status.HTTP_400_BAD_REQUEST
                                 )
-                        setattr(quote, backend_field, value)
+                        # ✅ GESTION SPÉCIALE POUR OPPORTUNITY - Convertir l'ID en objet
+                        if frontend_field == 'opportunity' and value:
+                            try:
+                                from opportunite.models import Opportunity
+                                opportunity = Opportunity.objects.get(id=value)
+                                setattr(quote, backend_field, opportunity)
+                            except Opportunity.DoesNotExist:
+                                return Response(
+                                    {"detail": f"L'opportunité avec l'ID {value} n'existe pas."}, 
+                                    status=status.HTTP_400_BAD_REQUEST
+                                )
+                            except Exception as e:
+                                return Response(
+                                    {"detail": f"Erreur lors de la récupération de l'opportunité: {str(e)}"}, 
+                                    status=status.HTTP_400_BAD_REQUEST
+                                )
+                        else:
+                            setattr(quote, backend_field, value)
                 
                 # Gérer les éléments
                 items_data = request.data.get('items', [])
@@ -602,6 +619,23 @@ class QuoteViewSet(viewsets.ModelViewSet):
                     
                     # ✅ GESTION STANDARD DES AUTRES CHAMPS
                     backend_quote_data[backend_field] = value
+                
+                # Traitement spécial pour le champ opportunity
+                if 'opportunity' in quote_data and quote_data['opportunity']:
+                    try:
+                        from opportunite.models import Opportunity
+                        opportunity = Opportunity.objects.get(id=quote_data['opportunity'])
+                        backend_quote_data['opportunity'] = opportunity
+                    except Opportunity.DoesNotExist:
+                        return Response(
+                            {"detail": f"L'opportunité avec l'ID {quote_data['opportunity']} n'existe pas."}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    except Exception as e:
+                        return Response(
+                            {"detail": f"Erreur lors de la récupération de l'opportunité: {str(e)}"}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
                 
                 # Définir des valeurs par défaut
                 backend_quote_data.setdefault('issue_date', timezone.now().date())
