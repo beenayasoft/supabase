@@ -1,0 +1,13 @@
+django
+djangorestframework
+django-socio-grpc
+drf-yasg
+django-cors-headers
+django-filter
+djangorestframework-simplejwt
+pytest-django
+ipython
+reportlab
+psycopg2-binary
+psycopg
+python-dotenv

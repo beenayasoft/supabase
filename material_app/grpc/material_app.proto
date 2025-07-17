@@ -1,0 +1,217 @@
+syntax = "proto3";
+
+package material_service.material_app;
+
+import "google/protobuf/empty.proto";
+
+service EquipmentCategoryController {
+    rpc Create(EquipmentCategoryRequest) returns (EquipmentCategoryResponse) {}
+    rpc Destroy(EquipmentCategoryDestroyRequest) returns (google.protobuf.Empty) {}
+    rpc List(EquipmentCategoryListRequest) returns (EquipmentCategoryListResponse) {}
+    rpc PartialUpdate(EquipmentCategoryPartialUpdateRequest) returns (EquipmentCategoryResponse) {}
+    rpc Retrieve(EquipmentCategoryRetrieveRequest) returns (EquipmentCategoryResponse) {}
+    rpc Update(EquipmentCategoryRequest) returns (EquipmentCategoryResponse) {}
+}
+
+service EquipmentController {
+    rpc Create(EquipmentRequest) returns (EquipmentResponse) {}
+    rpc Destroy(EquipmentDestroyRequest) returns (google.protobuf.Empty) {}
+    rpc List(EquipmentListRequest) returns (EquipmentListResponse) {}
+    rpc PartialUpdate(EquipmentPartialUpdateRequest) returns (EquipmentResponse) {}
+    rpc Retrieve(EquipmentRetrieveRequest) returns (EquipmentResponse) {}
+    rpc Update(EquipmentRequest) returns (EquipmentResponse) {}
+}
+
+service EquipmentMovementController {
+    rpc Create(EquipmentMovementRequest) returns (EquipmentMovementResponse) {}
+    rpc Destroy(EquipmentMovementDestroyRequest) returns (google.protobuf.Empty) {}
+    rpc List(EquipmentMovementListRequest) returns (EquipmentMovementListResponse) {}
+    rpc PartialUpdate(EquipmentMovementPartialUpdateRequest) returns (EquipmentMovementResponse) {}
+    rpc Retrieve(EquipmentMovementRetrieveRequest) returns (EquipmentMovementResponse) {}
+    rpc Update(EquipmentMovementRequest) returns (EquipmentMovementResponse) {}
+}
+
+service EquipmentReservationController {
+    rpc Create(EquipmentReservationRequest) returns (EquipmentReservationResponse) {}
+    rpc Destroy(EquipmentReservationDestroyRequest) returns (google.protobuf.Empty) {}
+    rpc List(EquipmentReservationListRequest) returns (EquipmentReservationListResponse) {}
+    rpc PartialUpdate(EquipmentReservationPartialUpdateRequest) returns (EquipmentReservationResponse) {}
+    rpc Retrieve(EquipmentReservationRetrieveRequest) returns (EquipmentReservationResponse) {}
+    rpc Update(EquipmentReservationRequest) returns (EquipmentReservationResponse) {}
+}
+
+message EquipmentCategoryDestroyRequest {
+    int32 id = 1;
+}
+
+message EquipmentCategoryListRequest {
+}
+
+message EquipmentCategoryListResponse {
+    repeated EquipmentCategoryResponse results = 1;
+}
+
+message EquipmentCategoryPartialUpdateRequest {
+    optional int32 id = 1;
+    repeated string _partial_update_fields = 2;
+    string name = 3;
+    optional string description = 4;
+}
+
+message EquipmentCategoryRequest {
+    optional int32 id = 1;
+    string name = 2;
+    optional string description = 3;
+}
+
+message EquipmentCategoryResponse {
+    optional int32 id = 1;
+    string name = 2;
+    optional string description = 3;
+}
+
+message EquipmentCategoryRetrieveRequest {
+    int32 id = 1;
+}
+
+message EquipmentDestroyRequest {
+    int32 id = 1;
+}
+
+message EquipmentListRequest {
+}
+
+message EquipmentListResponse {
+    repeated EquipmentResponse results = 1;
+}
+
+message EquipmentMovementDestroyRequest {
+    int32 id = 1;
+}
+
+message EquipmentMovementListRequest {
+}
+
+message EquipmentMovementListResponse {
+    repeated EquipmentMovementResponse results = 1;
+}
+
+message EquipmentMovementPartialUpdateRequest {
+    optional int32 id = 1;
+    repeated string _partial_update_fields = 2;
+    string from_location = 3;
+    string to_location = 4;
+    optional string notes = 5;
+    int64 equipment = 6;
+    optional string end_date = 7;
+    optional int64 reservation = 8;
+}
+
+message EquipmentMovementRequest {
+    optional int32 id = 1;
+    string from_location = 2;
+    string to_location = 3;
+    optional string notes = 4;
+    int64 equipment = 5;
+    optional string end_date = 6;
+    optional int64 reservation = 7;
+}
+
+message EquipmentMovementResponse {
+    optional int32 id = 1;
+    string from_location = 2;
+    string to_location = 3;
+    optional string moved_at = 4;
+    optional string notes = 5;
+    int64 equipment = 6;
+    optional string end_date = 7;
+    optional int64 reservation = 8;
+}
+
+message EquipmentMovementRetrieveRequest {
+    int32 id = 1;
+}
+
+message EquipmentPartialUpdateRequest {
+    optional int32 id = 1;
+    repeated string _partial_update_fields = 2;
+    string name = 3;
+    string serial_number = 4;
+    optional string description = 5;
+    optional bool is_available = 6;
+    int64 category = 7;
+}
+
+message EquipmentRequest {
+    optional int32 id = 1;
+    string name = 2;
+    string serial_number = 3;
+    optional string description = 4;
+    optional bool is_available = 5;
+    int64 category = 6;
+}
+
+message EquipmentReservationDestroyRequest {
+    int32 id = 1;
+}
+
+message EquipmentReservationListRequest {
+}
+
+message EquipmentReservationListResponse {
+    repeated EquipmentReservationResponse results = 1;
+}
+
+message EquipmentReservationPartialUpdateRequest {
+    optional int32 id = 1;
+    repeated string _partial_update_fields = 2;
+    string context_id = 3;
+    string start_date = 4;
+    string end_date = 5;
+    optional string status = 6;
+    optional string notes = 7;
+    int64 equipment = 8;
+    optional int64 fulfilled_movement = 9;
+}
+
+message EquipmentReservationRequest {
+    optional int32 id = 1;
+    string context_id = 2;
+    string start_date = 3;
+    string end_date = 4;
+    optional string status = 5;
+    optional string notes = 6;
+    int64 equipment = 7;
+    optional int64 fulfilled_movement = 8;
+}
+
+message EquipmentReservationResponse {
+    optional int32 id = 1;
+    string context_id = 2;
+    string start_date = 3;
+    string end_date = 4;
+    optional string status = 5;
+    optional string created_at = 6;
+    optional string updated_at = 7;
+    optional string notes = 8;
+    int64 equipment = 9;
+    optional int64 fulfilled_movement = 10;
+}
+
+message EquipmentReservationRetrieveRequest {
+    int32 id = 1;
+}
+
+message EquipmentResponse {
+    optional int32 id = 1;
+    string name = 2;
+    string serial_number = 3;
+    optional string description = 4;
+    optional bool is_available = 5;
+    int64 category = 6;
+}
+
+message EquipmentRetrieveRequest {
+    int32 id = 1;
+}
+
