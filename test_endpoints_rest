@@ -1,0 +1,148 @@
+# Tests Postman pour l'API REST
+Base URL: http://localhost:8000/api
+
+# 1. EQUIPMENT CATEGORIES
+## 1.1 Créer une catégorie
+POST /equipment-categories/
+Content-Type: application/json
+{
+    "name": "Compresseurs",
+    "description": "Machines de compression d'air"
+}
+
+## 1.2 Lister les catégories
+GET /equipment-categories/
+
+## 1.3 Modifier une catégorie
+PATCH /equipment-categories/1/
+Content-Type: application/json
+{
+    "description": "Machines de compression d'air industriel"
+}
+
+# 2. EQUIPMENT
+## 2.1 Créer un équipement
+POST /equipment/
+Content-Type: application/json
+{
+    "name": "Compresseur Atlas XL",
+    "category": 1,
+    "serial_number": "COMP-2024-001",
+    "description": "Compresseur industriel 200L"
+}
+
+## 2.2 Lister les équipements
+GET /equipment/
+
+## 2.3 Détail d'un équipement
+GET /equipment/1/
+
+# 3. EQUIPMENT MOVEMENTS
+## 3.1 Créer un mouvement
+POST /equipment-movements/
+Content-Type: application/json
+{
+    "equipment": 1,
+    "from_location": "Entrepôt A",
+    "to_location": "Atelier B",
+    "start_date": "2024-03-20T08:00:00Z",
+    "end_date": "2024-03-25T17:00:00Z",
+    "notes": "Déplacement pour maintenance"
+}
+
+## 3.2 Test de validation (conflit de dates - doit échouer)
+POST /equipment-movements/
+Content-Type: application/json
+{
+    "equipment": 1,
+    "from_location": "Atelier B",
+    "to_location": "Atelier C",
+    "start_date": "2024-03-22T08:00:00Z",
+    "end_date": "2024-03-23T17:00:00Z",
+    "notes": "Ce mouvement devrait être rejeté"
+}
+
+# 4. MAINTENANCE PLANS
+## 4.1 Créer un plan basé sur le temps
+POST /maintenance-plans/
+Content-Type: application/json
+{
+    "equipment": 1,
+    "name": "Maintenance Annuelle",
+    "type": "TIME_BASED",
+    "frequency_in_months": 12,
+    "next_due_date": "2025-03-20",
+    "is_active": true
+}
+
+## 4.2 Créer un plan basé sur l'usage
+POST /maintenance-plans/
+Content-Type: application/json
+{
+    "equipment": 1,
+    "name": "Maintenance 1000h",
+    "type": "USAGE_BASED",
+    "hour_counter_threshold": 1000,
+    "last_maintenance_hours": 0,
+    "is_active": true
+}
+
+## 4.3 Lister les plans
+GET /maintenance-plans/
+
+# 5. MAINTENANCE LOGS
+## 5.1 Créer un log de maintenance préventive
+POST /maintenance-logs/
+Content-Type: application/json
+{
+    "equipment": 1,
+    "maintenance_plan": "ID_DU_PLAN",  # Remplacer par l'UUID réel
+    "intervention_type": "PREVENTIVE",
+    "date": "2024-03-20",
+    "description": "Maintenance annuelle effectuée",
+    "hour_counter_at_maintenance": 980,
+    "cost_parts": 150.75,
+    "cost_labor": 200.00
+}
+
+## 5.2 Créer un log de maintenance curative
+POST /maintenance-logs/
+Content-Type: application/json
+{
+    "equipment": 1,
+    "intervention_type": "CURATIVE",
+    "date": "2024-03-21",
+    "description": "Réparation fuite d'air",
+    "hour_counter_at_maintenance": 985,
+    "cost_parts": 45.50,
+    "cost_labor": 75.00
+}
+
+## 5.3 Lister les logs
+GET /maintenance-logs/
+
+# 6. TESTS DE SUPPRESSION
+## 6.1 Supprimer un log
+DELETE /maintenance-logs/1/
+
+## 6.2 Supprimer un plan
+DELETE /maintenance-plans/ID_DU_PLAN/  # Remplacer par l'UUID réel
+
+## 6.3 Supprimer un mouvement
+DELETE /equipment-movements/1/
+
+## 6.4 Supprimer un équipement
+DELETE /equipment/1/
+
+## 6.5 Supprimer une catégorie
+DELETE /equipment-categories/1/
+
+# Notes importantes pour Postman :
+1. Créer une nouvelle collection "Material Service API"
+2. Définir une variable d'environnement "base_url" = "http://localhost:8000/api"
+3. Pour chaque requête :
+   - URL : {{base_url}}/endpoint
+   - Headers : Content-Type: application/json
+4. Exécuter les tests dans l'ordre (les IDs sont dépendants)
+5. Noter les UUIDs des plans de maintenance créés pour les utiliser dans les logs
+6. Le test de conflit de dates (3.2) doit retourner une erreur 400 

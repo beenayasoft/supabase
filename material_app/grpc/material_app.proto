@@ -31,13 +31,22 @@ service EquipmentMovementController {
     rpc Update(EquipmentMovementRequest) returns (EquipmentMovementResponse) {}
 }
 
-service EquipmentReservationController {
-    rpc Create(EquipmentReservationRequest) returns (EquipmentReservationResponse) {}
-    rpc Destroy(EquipmentReservationDestroyRequest) returns (google.protobuf.Empty) {}
-    rpc List(EquipmentReservationListRequest) returns (EquipmentReservationListResponse) {}
-    rpc PartialUpdate(EquipmentReservationPartialUpdateRequest) returns (EquipmentReservationResponse) {}
-    rpc Retrieve(EquipmentReservationRetrieveRequest) returns (EquipmentReservationResponse) {}
-    rpc Update(EquipmentReservationRequest) returns (EquipmentReservationResponse) {}
+service MaintenanceLogController {
+    rpc Create(MaintenanceLogRequest) returns (MaintenanceLogResponse) {}
+    rpc Destroy(MaintenanceLogDestroyRequest) returns (google.protobuf.Empty) {}
+    rpc List(MaintenanceLogListRequest) returns (MaintenanceLogListResponse) {}
+    rpc PartialUpdate(MaintenanceLogPartialUpdateRequest) returns (MaintenanceLogResponse) {}
+    rpc Retrieve(MaintenanceLogRetrieveRequest) returns (MaintenanceLogResponse) {}
+    rpc Update(MaintenanceLogRequest) returns (MaintenanceLogResponse) {}
+}
+
+service MaintenancePlanController {
+    rpc Create(MaintenancePlanRequest) returns (MaintenancePlanResponse) {}
+    rpc Destroy(MaintenancePlanDestroyRequest) returns (google.protobuf.Empty) {}
+    rpc List(MaintenancePlanListRequest) returns (MaintenancePlanListResponse) {}
+    rpc PartialUpdate(MaintenancePlanPartialUpdateRequest) returns (MaintenancePlanResponse) {}
+    rpc Retrieve(MaintenancePlanRetrieveRequest) returns (MaintenancePlanResponse) {}
+    rpc Update(MaintenancePlanRequest) returns (MaintenancePlanResponse) {}
 }
 
 message EquipmentCategoryDestroyRequest {
@@ -103,8 +112,8 @@ message EquipmentMovementPartialUpdateRequest {
     string to_location = 4;
     optional string notes = 5;
     int64 equipment = 6;
-    optional string end_date = 7;
-    optional int64 reservation = 8;
+    string start_date = 7;
+    optional string end_date = 8;
 }
 
 message EquipmentMovementRequest {
@@ -113,19 +122,18 @@ message EquipmentMovementRequest {
     string to_location = 3;
     optional string notes = 4;
     int64 equipment = 5;
-    optional string end_date = 6;
-    optional int64 reservation = 7;
+    string start_date = 6;
+    optional string end_date = 7;
 }
 
 message EquipmentMovementResponse {
     optional int32 id = 1;
     string from_location = 2;
     string to_location = 3;
-    optional string moved_at = 4;
     optional string notes = 5;
     int64 equipment = 6;
-    optional string end_date = 7;
-    optional int64 reservation = 8;
+    string start_date = 7;
+    optional string end_date = 8;
 }
 
 message EquipmentMovementRetrieveRequest {
@@ -151,57 +159,6 @@ message EquipmentRequest {
     int64 category = 6;
 }
 
-message EquipmentReservationDestroyRequest {
-    int32 id = 1;
-}
-
-message EquipmentReservationListRequest {
-}
-
-message EquipmentReservationListResponse {
-    repeated EquipmentReservationResponse results = 1;
-}
-
-message EquipmentReservationPartialUpdateRequest {
-    optional int32 id = 1;
-    repeated string _partial_update_fields = 2;
-    string context_id = 3;
-    string start_date = 4;
-    string end_date = 5;
-    optional string status = 6;
-    optional string notes = 7;
-    int64 equipment = 8;
-    optional int64 fulfilled_movement = 9;
-}
-
-message EquipmentReservationRequest {
-    optional int32 id = 1;
-    string context_id = 2;
-    string start_date = 3;
-    string end_date = 4;
-    optional string status = 5;
-    optional string notes = 6;
-    int64 equipment = 7;
-    optional int64 fulfilled_movement = 8;
-}
-
-message EquipmentReservationResponse {
-    optional int32 id = 1;
-    string context_id = 2;
-    string start_date = 3;
-    string end_date = 4;
-    optional string status = 5;
-    optional string created_at = 6;
-    optional string updated_at = 7;
-    optional string notes = 8;
-    int64 equipment = 9;
-    optional int64 fulfilled_movement = 10;
-}
-
-message EquipmentReservationRetrieveRequest {
-    int32 id = 1;
-}
-
 message EquipmentResponse {
     optional int32 id = 1;
     string name = 2;
@@ -213,5 +170,115 @@ message EquipmentResponse {
 
 message EquipmentRetrieveRequest {
     int32 id = 1;
+}
+
+message MaintenanceLogDestroyRequest {
+    string id = 1;
+}
+
+message MaintenanceLogListRequest {
+}
+
+message MaintenanceLogListResponse {
+    repeated MaintenanceLogResponse results = 1;
+}
+
+message MaintenanceLogPartialUpdateRequest {
+    optional string id = 1;
+    repeated string _partial_update_fields = 2;
+    string intervention_type = 3;
+    string date = 4;
+    string description = 5;
+    optional int32 hour_counter_at_maintenance = 6;
+    optional double cost_parts = 7;
+    optional double cost_labor = 8;
+    optional int32 document_id = 9;
+    int64 equipment = 10;
+    optional string maintenance_plan = 11;
+    optional int32 performed_by = 12;
+}
+
+message MaintenanceLogRequest {
+    optional string id = 1;
+    string intervention_type = 2;
+    string date = 3;
+    string description = 4;
+    optional int32 hour_counter_at_maintenance = 5;
+    optional double cost_parts = 6;
+    optional double cost_labor = 7;
+    optional int32 document_id = 8;
+    int64 equipment = 9;
+    optional string maintenance_plan = 10;
+    optional int32 performed_by = 11;
+}
+
+message MaintenanceLogResponse {
+    optional string id = 1;
+    string intervention_type = 2;
+    string date = 3;
+    string description = 4;
+    optional int32 hour_counter_at_maintenance = 5;
+    optional double cost_parts = 6;
+    optional double cost_labor = 7;
+    optional int32 document_id = 8;
+    int64 equipment = 9;
+    optional string maintenance_plan = 10;
+    optional int32 performed_by = 11;
+}
+
+message MaintenanceLogRetrieveRequest {
+    string id = 1;
+}
+
+message MaintenancePlanDestroyRequest {
+    string id = 1;
+}
+
+message MaintenancePlanListRequest {
+}
+
+message MaintenancePlanListResponse {
+    repeated MaintenancePlanResponse results = 1;
+}
+
+message MaintenancePlanPartialUpdateRequest {
+    optional string id = 1;
+    repeated string _partial_update_fields = 2;
+    string name = 3;
+    string type = 4;
+    optional int32 frequency_in_months = 5;
+    optional string next_due_date = 6;
+    optional int32 hour_counter_threshold = 7;
+    optional int32 last_maintenance_hours = 8;
+    optional bool is_active = 9;
+    int64 equipment = 10;
+}
+
+message MaintenancePlanRequest {
+    optional string id = 1;
+    string name = 2;
+    string type = 3;
+    optional int32 frequency_in_months = 4;
+    optional string next_due_date = 5;
+    optional int32 hour_counter_threshold = 6;
+    optional int32 last_maintenance_hours = 7;
+    optional bool is_active = 8;
+    int64 equipment = 9;
+}
+
+message MaintenancePlanResponse {
+    optional string id = 1;
+    string name = 2;
+    string type = 3;
+    optional int32 frequency_in_months = 4;
+    optional string next_due_date = 5;
+    optional int32 hour_counter_threshold = 6;
+    optional int32 last_maintenance_hours = 7;
+    optional bool is_active = 8;
+    int64 equipment = 9;
+}
+
+message MaintenancePlanRetrieveRequest {
+    string id = 1;
 }
 

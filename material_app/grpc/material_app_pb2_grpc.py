@@ -887,7 +887,7 @@ class EquipmentMovementController(object):
             _registered_method=True)
 
 
-class EquipmentReservationControllerStub(object):
+class MaintenanceLogControllerStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -897,38 +897,38 @@ class EquipmentReservationControllerStub(object):
             channel: A grpc.Channel.
         """
         self.Create = channel.unary_unary(
-                '/material_service.material_app.EquipmentReservationController/Create',
-                request_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRequest.SerializeToString,
-                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.FromString,
+                '/material_service.material_app.MaintenanceLogController/Create',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.FromString,
                 _registered_method=True)
         self.Destroy = channel.unary_unary(
-                '/material_service.material_app.EquipmentReservationController/Destroy',
-                request_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationDestroyRequest.SerializeToString,
+                '/material_service.material_app.MaintenanceLogController/Destroy',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogDestroyRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.List = channel.unary_unary(
-                '/material_service.material_app.EquipmentReservationController/List',
-                request_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationListRequest.SerializeToString,
-                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationListResponse.FromString,
+                '/material_service.material_app.MaintenanceLogController/List',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogListRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogListResponse.FromString,
                 _registered_method=True)
         self.PartialUpdate = channel.unary_unary(
-                '/material_service.material_app.EquipmentReservationController/PartialUpdate',
-                request_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationPartialUpdateRequest.SerializeToString,
-                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.FromString,
+                '/material_service.material_app.MaintenanceLogController/PartialUpdate',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogPartialUpdateRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.FromString,
                 _registered_method=True)
         self.Retrieve = channel.unary_unary(
-                '/material_service.material_app.EquipmentReservationController/Retrieve',
-                request_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRetrieveRequest.SerializeToString,
-                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.FromString,
+                '/material_service.material_app.MaintenanceLogController/Retrieve',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRetrieveRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.FromString,
                 _registered_method=True)
         self.Update = channel.unary_unary(
-                '/material_service.material_app.EquipmentReservationController/Update',
-                request_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRequest.SerializeToString,
-                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.FromString,
+                '/material_service.material_app.MaintenanceLogController/Update',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.FromString,
                 _registered_method=True)
 
 
-class EquipmentReservationControllerServicer(object):
+class MaintenanceLogControllerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def Create(self, request, context):
@@ -968,47 +968,47 @@ class EquipmentReservationControllerServicer(object):
         raise NotImplementedError('Method not implemented!')
 
 
-def add_EquipmentReservationControllerServicer_to_server(servicer, server):
+def add_MaintenanceLogControllerServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Create': grpc.unary_unary_rpc_method_handler(
                     servicer.Create,
-                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRequest.FromString,
-                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.SerializeToString,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.SerializeToString,
             ),
             'Destroy': grpc.unary_unary_rpc_method_handler(
                     servicer.Destroy,
-                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationDestroyRequest.FromString,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogDestroyRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'List': grpc.unary_unary_rpc_method_handler(
                     servicer.List,
-                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationListRequest.FromString,
-                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationListResponse.SerializeToString,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogListRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogListResponse.SerializeToString,
             ),
             'PartialUpdate': grpc.unary_unary_rpc_method_handler(
                     servicer.PartialUpdate,
-                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationPartialUpdateRequest.FromString,
-                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.SerializeToString,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogPartialUpdateRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.SerializeToString,
             ),
             'Retrieve': grpc.unary_unary_rpc_method_handler(
                     servicer.Retrieve,
-                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRetrieveRequest.FromString,
-                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.SerializeToString,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRetrieveRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.SerializeToString,
             ),
             'Update': grpc.unary_unary_rpc_method_handler(
                     servicer.Update,
-                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRequest.FromString,
-                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.SerializeToString,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'material_service.material_app.EquipmentReservationController', rpc_method_handlers)
+            'material_service.material_app.MaintenanceLogController', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('material_service.material_app.EquipmentReservationController', rpc_method_handlers)
+    server.add_registered_method_handlers('material_service.material_app.MaintenanceLogController', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class EquipmentReservationController(object):
+class MaintenanceLogController(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -1025,9 +1025,9 @@ class EquipmentReservationController(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/material_service.material_app.EquipmentReservationController/Create',
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRequest.SerializeToString,
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.FromString,
+            '/material_service.material_app.MaintenanceLogController/Create',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1052,8 +1052,8 @@ class EquipmentReservationController(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/material_service.material_app.EquipmentReservationController/Destroy',
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationDestroyRequest.SerializeToString,
+            '/material_service.material_app.MaintenanceLogController/Destroy',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogDestroyRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
@@ -1079,9 +1079,9 @@ class EquipmentReservationController(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/material_service.material_app.EquipmentReservationController/List',
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationListRequest.SerializeToString,
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationListResponse.FromString,
+            '/material_service.material_app.MaintenanceLogController/List',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogListRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogListResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1106,9 +1106,9 @@ class EquipmentReservationController(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/material_service.material_app.EquipmentReservationController/PartialUpdate',
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationPartialUpdateRequest.SerializeToString,
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.FromString,
+            '/material_service.material_app.MaintenanceLogController/PartialUpdate',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogPartialUpdateRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1133,9 +1133,9 @@ class EquipmentReservationController(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/material_service.material_app.EquipmentReservationController/Retrieve',
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRetrieveRequest.SerializeToString,
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.FromString,
+            '/material_service.material_app.MaintenanceLogController/Retrieve',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRetrieveRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1160,9 +1160,296 @@ class EquipmentReservationController(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/material_service.material_app.EquipmentReservationController/Update',
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationRequest.SerializeToString,
-            material__app_dot_grpc_dot_material__app__pb2.EquipmentReservationResponse.FromString,
+            '/material_service.material_app.MaintenanceLogController/Update',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenanceLogResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class MaintenancePlanControllerStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.Create = channel.unary_unary(
+                '/material_service.material_app.MaintenancePlanController/Create',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.FromString,
+                _registered_method=True)
+        self.Destroy = channel.unary_unary(
+                '/material_service.material_app.MaintenancePlanController/Destroy',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanDestroyRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+        self.List = channel.unary_unary(
+                '/material_service.material_app.MaintenancePlanController/List',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanListRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanListResponse.FromString,
+                _registered_method=True)
+        self.PartialUpdate = channel.unary_unary(
+                '/material_service.material_app.MaintenancePlanController/PartialUpdate',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanPartialUpdateRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.FromString,
+                _registered_method=True)
+        self.Retrieve = channel.unary_unary(
+                '/material_service.material_app.MaintenancePlanController/Retrieve',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRetrieveRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.FromString,
+                _registered_method=True)
+        self.Update = channel.unary_unary(
+                '/material_service.material_app.MaintenancePlanController/Update',
+                request_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRequest.SerializeToString,
+                response_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.FromString,
+                _registered_method=True)
+
+
+class MaintenancePlanControllerServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def Create(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Destroy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def List(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PartialUpdate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Retrieve(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Update(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_MaintenancePlanControllerServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'Create': grpc.unary_unary_rpc_method_handler(
+                    servicer.Create,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.SerializeToString,
+            ),
+            'Destroy': grpc.unary_unary_rpc_method_handler(
+                    servicer.Destroy,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanDestroyRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'List': grpc.unary_unary_rpc_method_handler(
+                    servicer.List,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanListRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanListResponse.SerializeToString,
+            ),
+            'PartialUpdate': grpc.unary_unary_rpc_method_handler(
+                    servicer.PartialUpdate,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanPartialUpdateRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.SerializeToString,
+            ),
+            'Retrieve': grpc.unary_unary_rpc_method_handler(
+                    servicer.Retrieve,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRetrieveRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.SerializeToString,
+            ),
+            'Update': grpc.unary_unary_rpc_method_handler(
+                    servicer.Update,
+                    request_deserializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRequest.FromString,
+                    response_serializer=material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'material_service.material_app.MaintenancePlanController', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('material_service.material_app.MaintenancePlanController', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class MaintenancePlanController(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Create(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/material_service.material_app.MaintenancePlanController/Create',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Destroy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/material_service.material_app.MaintenancePlanController/Destroy',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanDestroyRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def List(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/material_service.material_app.MaintenancePlanController/List',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanListRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanListResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PartialUpdate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/material_service.material_app.MaintenancePlanController/PartialUpdate',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanPartialUpdateRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Retrieve(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/material_service.material_app.MaintenancePlanController/Retrieve',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRetrieveRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Update(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/material_service.material_app.MaintenancePlanController/Update',
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanRequest.SerializeToString,
+            material__app_dot_grpc_dot_material__app__pb2.MaintenancePlanResponse.FromString,
             options,
             channel_credentials,
             insecure,

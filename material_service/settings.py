@@ -41,8 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "material_app",
-    #"rest_framework",
-    #"drf_yasg",
+    "rest_framework",
     "corsheaders",
     "django_socio_grpc",
 ]
@@ -50,6 +49,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -145,3 +145,11 @@ DSGRPC = {
 GRPC_FRAMEWORK = {
     "ROOT_HANDLERS_HOOK": "material_app.handlers.grpc_handlers",
 }
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+}
+
+# CORS settings
+CORS_ORIGIN_ALLOW_ALL = True  # Only for development!
